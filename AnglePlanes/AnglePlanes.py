@@ -37,19 +37,6 @@ class AnglePlanes(ScriptedLoadableModule):
 
 
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
-    def __init__(self, parent = None):
-        self.developerMode = True
-        if not parent:
-            self.parent = slicer.qMRMLWidget()
-            self.parent.setLayout(qt.QVBoxLayout())
-            self.parent.setMRMLScene(slicer.mrmlScene)
-        else:
-            self.parent = parent
-        self.layout = self.parent.layout()
-        if not parent:
-            self.setup()
-            self.parent.show()
-    
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
         self.moduleName = "AnglePlanes"
@@ -162,6 +149,19 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.placePlaneButton = qt.QPushButton("Define and Place Planes")
         self.placePlaneButton.connect('clicked()', self.onValueChanged)
 
+
+        nodes = slicer.mrmlScene.GetNodesByClass('vtkMRMLMarkupsFiducialNode')
+
+        if nodes.GetNumberOfItems() == 0:
+            # first fiducial list
+            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
+            slicer.mrmlScene.AddNode(displayNode1)
+
+            fidNode1 = slicer.vtkMRMLMarkupsFiducialNode()
+            fidNode1.SetName("P-1")
+            slicer.mrmlScene.AddNode(fidNode1)
+            fidNode1.AddObserver(vtk.vtkCommand.ModifiedEvent, self.OnFiducialModified)
+                
 
         self.slider = ctk.ctkSliderWidget()
         self.slider.singleStep = 0.1
@@ -295,6 +295,13 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
     
+    def OnFiducialModified(self, obj, event):
+        
+        print "evt"
+        self.Landmark1ComboBox.addItem(self.i+1)
+        self.Landmark2ComboBox.addItem(self.i+1)
+        self.Landmark3ComboBox.addItem(self.i+1)
+        self.i = self.i+1
     
     def onComputeBox(self):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
