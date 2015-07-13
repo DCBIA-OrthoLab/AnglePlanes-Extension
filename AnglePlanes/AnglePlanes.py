@@ -35,7 +35,6 @@ class AnglePlanes(ScriptedLoadableModule):
         
         self.parent = parent
 
-
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
@@ -109,7 +108,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # labelLandmark = qt.QLabel('Choose 3 Landmarks to define the plane: ')
         #
         # label1 = qt.QLabel('Landmark 1: ')
-        # self.Landmark1ComboBox = qt.QComboBox()
+        # self.Landmark1ComboBox = qt.QCComboBox()
         # self.Landmark1ComboBox.addItem("List of fiducials")
         # landmark1Layout = qt.QHBoxLayout()
         # landmark1Layout.addWidget(label1)
@@ -150,23 +149,23 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.placePlaneButton.connect('clicked()', self.onValueChanged)
 
 
-        nodes = slicer.mrmlScene.GetNodesByClass('vtkMRMLMarkupsFiducialNode')
+        # fiducial list for the plane
+        fidNode = self.logic.getFiducialList()
+        for i in range(0, fidNode.GetNumberOfFiducials()):
+            label = fidNode.GetNthFiducialLabel(i)
+            self.Landmark1ComboBox.addItem(label)
+            self.Landmark2ComboBox.addItem(label)
+            self.Landmark3ComboBox.addItem(label)
 
-        if nodes.GetNumberOfItems() == 0:
-            # first fiducial list
-            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
-            slicer.mrmlScene.AddNode(displayNode1)
-
-            fidNode1 = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNode1.SetName("P-1")
-            slicer.mrmlScene.AddNode(fidNode1)
-            fidNode1.AddObserver(vtk.vtkCommand.ModifiedEvent, self.OnFiducialModified)
+        fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
+        fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
+        fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
                 
 
         self.slider = ctk.ctkSliderWidget()
         self.slider.singleStep = 0.1
         self.slider.minimum = 0.1
-        self.slider.maximum = 100
+        self.slider.maximum = 10
         self.slider.value = 1.0
         self.slider.toolTip = "Set the size of your plane."
 
@@ -175,7 +174,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.slideOpacity.minimum = 0.1
         self.slideOpacity.maximum = 1
         self.slideOpacity.value = 1.0
-        self.slider.toolTip = "Set the opacity of your plane."
+        self.slideOpacity.toolTip = "Set the opacity of your plane."
 
         sampleFormLayout.addRow(landmarkFrame)
         sampleFormLayout.addRow(labelLandmark)
@@ -295,13 +294,37 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
     
-    def OnFiducialModified(self, obj, event):
+    def onFiducialAdded(self, obj, event):
+        fidlist = obj
+
+        label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
         
-        print "evt"
-        self.Landmark1ComboBox.addItem(self.i+1)
-        self.Landmark2ComboBox.addItem(self.i+1)
-        self.Landmark3ComboBox.addItem(self.i+1)
-        self.i = self.i+1
+        self.Landmark1ComboBox.addItem(label)
+        self.Landmark2ComboBox.addItem(label)
+        self.Landmark3ComboBox.addItem(label)
+        
+
+    def onFiducialRemoved(self, obj, event):
+        fidlist = obj
+        
+        for i in range(1, self.Landmark1ComboBox.count):
+            print i
+            found = self.fiducialInList(self.Landmark1ComboBox.itemText(i), fidlist)
+            if not found:
+                self.Landmark1ComboBox.removeItem(i)
+                self.Landmark2ComboBox.removeItem(i)
+                self.Landmark3ComboBox.removeItem(i)
+                break
+
+    def fiducialInList(self, name, fidlist):
+        for i in range(0, fidlist.GetNumberOfFiducials()):
+            if name == fidlist.GetNthFiducialLabel(i) :
+                print name, fidlist.GetNthFiducialLabel(i)
+                return True
+        return False
+
+    def onPointModifiedEvent(self, obj, event):
+        self.logic.planeLandmarks(self.Landmark1ComboBox.currentIndex, self.Landmark2ComboBox.currentIndex, self.Landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
     
     def onComputeBox(self):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
@@ -362,21 +385,27 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def addLandMarkClicked(self):
         print "Add landmarks"
         # # Place landmarks in the 3D scene
-        landmarks = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
-        landmarks.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
+        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1")
+
+        if nodes.GetNumberOfItems() == 0:
+            # The list does not exist so we create it
+            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
+            slicer.mrmlScene.AddNode(displayNode1)
+
+            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
+            fidNode.SetName("P1")
+            slicer.mrmlScene.AddNode(fidNode)
+
+        ins = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        ins.SetCurrentInteractionMode(1)
         
-        interactionLandmarks = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        interactionLandmarks.SetCurrentInteractionMode(1)
-        self.Landmark1ComboBox.addItem(self.i+1)
-        self.Landmark2ComboBox.addItem(self.i+1)
-        self.Landmark3ComboBox.addItem(self.i+1)
-        self.i = self.i+1
+
     
     def midPoint(self):
         print "Calculate midpoint "
     
     def placePlaneClicked(self):
-        self.logic.planeLandmarks(self.Landmark1ComboBox.currentText, self.Landmark2ComboBox.currentText, self.Landmark3ComboBox.currentText, self.slider.value, self.slideOpacity.value)
+        self.logic.planeLandmarks(self.Landmark1ComboBox.currentIndex, self.Landmark2ComboBox.currentIndex, self.Landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
     
     def onCloseScene(self, obj, event):
         self.logic.renderer.RemoveActor(self.logic.actor)
@@ -429,7 +458,26 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.ColorNodeCorrespondence = {'red': 'vtkMRMLSliceNodeRed',
             'yellow': 'vtkMRMLSliceNodeYellow',
             'green': 'vtkMRMLSliceNodeGreen'}
+        self.initialize()
 
+
+    def getFiducialList(self):
+        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1")
+
+        if nodes.GetNumberOfItems() == 0:
+            # The list does not exist so we create it
+            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
+            slicer.mrmlScene.AddNode(displayNode1)
+
+            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
+            fidNode.SetName("P1")
+            slicer.mrmlScene.AddNode(fidNode)
+            
+        else:
+            #The list exists but the observers must be updated
+            fidNode = nodes.GetItemAsObject(0)
+
+        return fidNode
 
     def initialize(self):
         self.layoutManager=slicer.app.layoutManager()
@@ -438,7 +486,15 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.renderWindow=self.threeDView.renderWindow()
         self.renderers=self.renderWindow.GetRenderers()
         self.renderer=self.renderers.GetFirstRenderer()
+        
+        self.polydata = vtk.vtkPolyData()
+        self.points = vtk.vtkPoints()
+        self.centerOfMass = vtk.vtkCenterOfMass()
+        self.planeSource = vtk.vtkPlaneSource()
+        self.mapper = vtk.vtkPolyDataMapper()
         self.actor = vtk.vtkActor()
+        self.renderer.AddViewProp(self.actor)
+        self.renderWindow.AddRenderer(self.renderer)
     
     def getMatrix(self, slice):
         self.mat = slice.GetSliceToRAS()
@@ -499,12 +555,12 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         fichier.write(str(self.m_Green) + '\n')
         fichier.write('\n')
         
-        fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+        fidNode = self.getFiducialList()
         if fidNode:
             
             fichier.write("Fiducial: \n")
             listCoord = list()
-            fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+            fidNode = self.getFiducialList()
             self.coord = numpy.zeros(3)
             fidNode.GetNthFiducialPosition(0, self.coord)
             listCoord.insert(0,self.coord)
@@ -512,7 +568,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             fichier.write('\n')
             
             listCoord = list()
-            fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+            fidNode = self.getFiducialList()
             self.coord = numpy.zeros(3)
             fidNode.GetNthFiducialPosition(1, self.coord)
             listCoord.insert(0,self.coord)
@@ -520,7 +576,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             fichier.write('\n')
             
             listCoord = list()
-            fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+            fidNode = self.getFiducialList()
             self.coord = numpy.zeros(3)
             fidNode.GetNthFiducialPosition(2, self.coord)
             listCoord.insert(0,self.coord)
@@ -824,13 +880,12 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.getAngle(normal1, normal2)
     
     def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity):
-        self.initialize()
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         listCoord = list()
-        fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+        fidNode = self.getFiducialList()
         self.coord = numpy.zeros(3)
-        if Landmark1Value != "List of fiducials":
+        if Landmark1Value != 0:
             fidNode.GetNthFiducialPosition(int(Landmark1Value)-1, self.coord)
             listCoord.append(self.coord)
         
@@ -844,9 +899,9 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         listCoord = list()
-        fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+        fidNode = self.getFiducialList()
         self.coord = numpy.zeros(3)
-        if Landmark2Value != "List of fiducials":
+        if Landmark2Value != 0:
             fidNode.GetNthFiducialPosition(int(Landmark2Value)-1, self.coord)
             listCoord.append(self.coord)
         
@@ -860,9 +915,9 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         listCoord = list()
-        fidNode = slicer.mrmlScene.GetNodeByID('vtkMRMLMarkupsFiducialNode1')
+        fidNode = self.getFiducialList()
         self.coord = numpy.zeros(3)
-        if Landmark3Value != "List of fiducials":
+        if Landmark3Value != 0:
             fidNode.GetNthFiducialPosition(int(Landmark3Value)-1, self.coord)
             listCoord.append(self.coord)
         
@@ -880,15 +935,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         # Vn = Vectorial Product (AB, BC)
         # Normal N = Vn/norm(Vn)
         
-        points = vtk.vtkPoints()
-        points.InsertNextPoint(r1,a1,s1)
-        points.InsertNextPoint(r2,a2,s2)
-        points.InsertNextPoint(r3,a3,s3)
-        
-        polydata = vtk.vtkPolyData()
+        points = self.points
+        if points.GetNumberOfPoints() == 0:
+            points.InsertNextPoint(r1,a1,s1)
+            points.InsertNextPoint(r2,a2,s2)
+            points.InsertNextPoint(r3,a3,s3)
+        else:
+            points.SetPoint(0, r1,a1,s1)
+            points.SetPoint(1, r2,a2,s2)
+            points.SetPoint(2, r3,a3,s3)
+
+            
+        polydata = self.polydata
         polydata.SetPoints(points)
-        
-        centerOfMass = vtk.vtkCenterOfMass()
+
+        centerOfMass = self.centerOfMass
         centerOfMass.SetInputData(polydata)
         centerOfMass.SetUseScalarsAsWeights(False)
         centerOfMass.Update()
@@ -947,10 +1008,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         F[2] = slider*GC[2] + G[2]
         
         print "F = ",F
-        
-        self.renderWindow.AddRenderer(self.renderer)
-        
-        planeSource = vtk.vtkPlaneSource()
+
+        planeSource = self.planeSource
         planeSource.SetNormal(self.N[0],self.N[1],self.N[2])
         
         planeSource.SetOrigin(D[0],D[1],D[2])
@@ -961,15 +1020,16 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         
         plane = planeSource.GetOutput()
         
-        mapper = vtk.vtkPolyDataMapper()
+        mapper = self.mapper
         mapper.SetInputData(plane)
+        mapper.Update()
         
         self.actor.SetMapper(mapper)
         self.actor.GetProperty().SetColor(0, 0.4, 0.8)
         self.actor.GetProperty().SetOpacity(sliderOpacity)
-        
-        self.renderer.AddActor(self.actor)
-        
+
+        self.renderer.AddViewProp(self.actor)
+        self.renderer.Render()
         self.renderWindow.Render()
 
 
