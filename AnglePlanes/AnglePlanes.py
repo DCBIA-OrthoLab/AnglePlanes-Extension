@@ -95,7 +95,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         landmarkFrame = qt.QFrame()
         landmarkFrame.setLayout(qt.QHBoxLayout())
-        landmarkLabel = qt.QLabel('Add Landmarks ')
+        landmarkLabel = qt.QLabel('Add Plane ')
         self.addLandMark = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
         self.addLandMark.setFixedSize(50,25)
         self.addLandMark.connect('clicked()', self.addLandMarkClicked)
@@ -413,9 +413,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         globals()[self.moduleName] = slicer.util.reloadScriptedModule(self.moduleName)
 
     def onValueChanged(self):
-        self.logic.initialize()
-        if self.logic.renderer:
-            self.logic.renderer.RemoveActor(self.logic.actor)
         self.placePlaneClicked()
     
     def angleValue(self):
@@ -489,7 +486,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         
         self.polydata = vtk.vtkPolyData()
         self.points = vtk.vtkPoints()
-        self.centerOfMass = vtk.vtkCenterOfMass()
         self.planeSource = vtk.vtkPlaneSource()
         self.mapper = vtk.vtkPolyDataMapper()
         self.actor = vtk.vtkActor()
@@ -882,58 +878,42 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
-        listCoord = list()
         fidNode = self.getFiducialList()
-        self.coord = numpy.zeros(3)
+
+        r1 = 0
+        a1 = 0
+        s1 = 0
+        coord = numpy.zeros(3)
+        
         if Landmark1Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark1Value)-1, self.coord)
-            listCoord.append(self.coord)
+            fidNode.GetNthFiducialPosition(int(Landmark1Value)-1, coord)
+            r1 = coord[0]
+            a1 = coord[1]
+            s1 = coord[2]
         
-        print self.coord
-        print listCoord
-        
-        r1 = self.coord[0]
-        a1 = self.coord[1]
-        s1 = self.coord[2]
         
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
-        listCoord = list()
-        fidNode = self.getFiducialList()
-        self.coord = numpy.zeros(3)
+        r2 = 0
+        a2 = 0
+        s2 = 0
         if Landmark2Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark2Value)-1, self.coord)
-            listCoord.append(self.coord)
-        
-        print self.coord
-        print listCoord
-        
-        r2 = self.coord[0]
-        a2 = self.coord[1]
-        s2 = self.coord[2]
+            fidNode.GetNthFiducialPosition(int(Landmark2Value)-1, coord)
+            r2 = coord[0]
+            a2 = coord[1]
+            s2 = coord[2]
         
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
-        listCoord = list()
-        fidNode = self.getFiducialList()
-        self.coord = numpy.zeros(3)
+        r3 = 0
+        a3 = 0
+        s3 = 0
         if Landmark3Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark3Value)-1, self.coord)
-            listCoord.append(self.coord)
+            fidNode.GetNthFiducialPosition(int(Landmark3Value)-1, coord)
+            r3 = coord[0]
+            a3 = coord[1]
+            s3 = coord[2]
         
-        print self.coord
-        print listCoord
-        
-        r3 = self.coord[0]
-        a3 = self.coord[1]
-        s3 = self.coord[2]
-        
-        
-        A = (r1,a1,s1)
-        B = (r2,a2,s2)
-        C = (r3,a3,s3)
-        # Vn = Vectorial Product (AB, BC)
-        # Normal N = Vn/norm(Vn)
         
         points = self.points
         if points.GetNumberOfPoints() == 0:
@@ -949,7 +929,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         polydata = self.polydata
         polydata.SetPoints(points)
 
-        centerOfMass = self.centerOfMass
+        centerOfMass = vtk.vtkCenterOfMass()
         centerOfMass.SetInputData(polydata)
         centerOfMass.SetUseScalarsAsWeights(False)
         centerOfMass.Update()
@@ -958,6 +938,10 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         
         print "Center of mass = ",G
         
+        A = (r1,a1,s1)
+        B = (r2,a2,s2)
+        C = (r3,a3,s3)
+
         # Vector GA
         GA = numpy.matrix([[0],[0],[0]])
         GA[0] = A[0]-G[0]
