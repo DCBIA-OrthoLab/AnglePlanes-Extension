@@ -8,6 +8,7 @@ from slicer.ScriptedLoadableModule import *
 
 import os
 
+import pickle
 
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
@@ -41,11 +42,14 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.moduleName = "AnglePlanes"
         self.i = 0
         self.logic = AnglePlanesLogic()
+        self.planeControlsId = 0
+        self.planeControlsDictionary = {}
         # self.logic.initializePlane()
         
         self.n_vector = numpy.matrix([[0], [0], [1], [1]])
-        
+
         self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        print "setup"
         #Definition of the 2 planes
 
         # Collapsible button -- Scene Description
@@ -86,105 +90,25 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
 
         self.CollapsibleButton = ctk.ctkCollapsibleButton()
-        self.CollapsibleButton.text = "Place Landmarks to define plane"
+        self.CollapsibleButton.text = "Manage planes"
         self.layout.addWidget(self.CollapsibleButton)
-        sampleFormLayout = qt.QFormLayout(self.CollapsibleButton)
-        self.CollapsibleButton.checked = False
+        self.managePlanesFormLayout = qt.QFormLayout(self.CollapsibleButton)
+        self.CollapsibleButton.checked = True
 
         # Collapsible button
 
-        landmarkFrame = qt.QFrame()
-        landmarkFrame.setLayout(qt.QHBoxLayout())
-        landmarkLabel = qt.QLabel('Add Plane ')
-        self.addLandMark = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
-        self.addLandMark.setFixedSize(50,25)
-        self.addLandMark.connect('clicked()', self.addLandMarkClicked)
-        self.addLandMark.setEnabled(True)
-        landmarkFrame.layout().addWidget(landmarkLabel)
-        landmarkFrame.layout().addWidget(self.addLandMark)
+        addNewPlaneLayout = qt.QHBoxLayout()
+        addPlaneLabel = qt.QLabel('Add new plane')
+        addPlaneButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
+        addPlaneButton.setFixedSize(50,25)
+        addPlaneButton.connect('clicked()', self.addNewPlane)
+        addPlaneButton.setEnabled(True)
+        addNewPlaneLayout.addWidget(addPlaneLabel)
+        addNewPlaneLayout.addWidget(addPlaneButton)
+        
+        self.managePlanesFormLayout.addRow(addNewPlaneLayout)
 
         # MIDPOINT PART
-
-        # labelLandmark = qt.QLabel('Choose 3 Landmarks to define the plane: ')
-        #
-        # label1 = qt.QLabel('Landmark 1: ')
-        # self.Landmark1ComboBox = qt.QCComboBox()
-        # self.Landmark1ComboBox.addItem("List of fiducials")
-        # landmark1Layout = qt.QHBoxLayout()
-        # landmark1Layout.addWidget(label1)
-        # landmark1Layout.addWidget(self.Landmark1ComboBox)
-        #
-        # label2 = qt.QLabel('Landmark 2: ')
-        # self.Landmark2ComboBox = qt.QComboBox()
-        # self.Landmark2ComboBox.addItem("List of fiducials")
-        # landmark2Layout = qt.QHBoxLayout()
-        # landmark2Layout.addWidget(label2)
-        # landmark2Layout.addWidget(self.Landmark2ComboBox)
-
-        labelLandmark = qt.QLabel('Choose 3 Landmarks to define the plane: ')
-
-        label1 = qt.QLabel('Landmark 1: ')
-        self.Landmark1ComboBox = qt.QComboBox()
-        self.Landmark1ComboBox.addItem("List of fiducials")
-        landmark1Layout = qt.QHBoxLayout()
-        landmark1Layout.addWidget(label1)
-        landmark1Layout.addWidget(self.Landmark1ComboBox)
-
-
-        label2 = qt.QLabel('Landmark 2: ')
-        self.Landmark2ComboBox = qt.QComboBox()
-        self.Landmark2ComboBox.addItem("List of fiducials")
-        landmark2Layout = qt.QHBoxLayout()
-        landmark2Layout.addWidget(label2)
-        landmark2Layout.addWidget(self.Landmark2ComboBox)
-
-        label3 = qt.QLabel('Landmark 3: ')
-        self.Landmark3ComboBox = qt.QComboBox()
-        self.Landmark3ComboBox.addItem("List of fiducials")
-        landmark3Layout = qt.QHBoxLayout()
-        landmark3Layout.addWidget(label3)
-        landmark3Layout.addWidget(self.Landmark3ComboBox)
-
-        self.placePlaneButton = qt.QPushButton("Define and Place Planes")
-        self.placePlaneButton.connect('clicked()', self.onValueChanged)
-
-
-        # fiducial list for the plane
-        fidNode = self.logic.getFiducialList()
-        for i in range(0, fidNode.GetNumberOfFiducials()):
-            label = fidNode.GetNthFiducialLabel(i)
-            self.Landmark1ComboBox.addItem(label)
-            self.Landmark2ComboBox.addItem(label)
-            self.Landmark3ComboBox.addItem(label)
-
-        fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
-        fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
-        fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
-                
-
-        self.slider = ctk.ctkSliderWidget()
-        self.slider.singleStep = 0.1
-        self.slider.minimum = 0.1
-        self.slider.maximum = 10
-        self.slider.value = 1.0
-        self.slider.toolTip = "Set the size of your plane."
-
-        self.slideOpacity = ctk.ctkSliderWidget()
-        self.slideOpacity.singleStep = 0.1
-        self.slideOpacity.minimum = 0.1
-        self.slideOpacity.maximum = 1
-        self.slideOpacity.value = 1.0
-        self.slideOpacity.toolTip = "Set the opacity of your plane."
-
-        sampleFormLayout.addRow(landmarkFrame)
-        sampleFormLayout.addRow(labelLandmark)
-        sampleFormLayout.addRow(landmark1Layout)
-        sampleFormLayout.addRow(landmark2Layout)
-        sampleFormLayout.addRow(landmark3Layout)
-        sampleFormLayout.addRow(self.placePlaneButton)
-        sampleFormLayout.addRow("Size of your plane", self.slider)
-        sampleFormLayout.addRow("Opacity of your plane", self.slideOpacity)
-
 
         self.CollapsibleButtonPlane = ctk.ctkCollapsibleButton()
         self.CollapsibleButtonPlane.text = "Choose planes"
@@ -196,7 +120,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox1.addItem("red")
         self.planeComboBox1.addItem("yellow")
         self.planeComboBox1.addItem("green")
-        self.planeComboBox1.addItem("Landmarks")
         sampleFormLayoutPlane.addRow("Select plane 1: ", self.planeComboBox1)
 
 
@@ -204,7 +127,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox2.addItem("red")
         self.planeComboBox2.addItem("yellow")
         self.planeComboBox2.addItem("green")
-        self.planeComboBox2.addItem("Landmarks")
         sampleFormLayoutPlane.addRow("Select plane 2: ", self.planeComboBox2)
 
 
@@ -285,46 +207,25 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox1.connect('currentIndexChanged(QString)', self.valueComboBox)
         self.planeComboBox2.connect('currentIndexChanged(QString)', self.valueComboBox)
 
-
-        self.slider.connect('valueChanged(double)', self.onValueChanged)
-        self.slideOpacity.connect('valueChanged(double)', self.onValueChanged)
-
-        save.connect('clicked(bool)', self.logic.savePlane)
-        read.connect('clicked(bool)', self.logic.readPlane)
+        save.connect('clicked(bool)', self.savePlanes)
+        read.connect('clicked(bool)', self.readPlane)
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
-    
-    def onFiducialAdded(self, obj, event):
-        fidlist = obj
 
-        label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
-        
-        self.Landmark1ComboBox.addItem(label)
-        self.Landmark2ComboBox.addItem(label)
-        self.Landmark3ComboBox.addItem(label)
-        
+    def addNewPlane(self, keyLoad = -1):
+        if keyLoad != -1:
+            self.planeControlsId = keyLoad
+        else:
+            self.planeControlsId += 1
 
-    def onFiducialRemoved(self, obj, event):
-        fidlist = obj
-        
-        for i in range(1, self.Landmark1ComboBox.count):
-            print i
-            found = self.fiducialInList(self.Landmark1ComboBox.itemText(i), fidlist)
-            if not found:
-                self.Landmark1ComboBox.removeItem(i)
-                self.Landmark2ComboBox.removeItem(i)
-                self.Landmark3ComboBox.removeItem(i)
-                break
+        planeControls = AnglePlanesWidgetPlaneControl(self.planeControlsId)
+        self.managePlanesFormLayout.addRow(planeControls)
 
-    def fiducialInList(self, name, fidlist):
-        for i in range(0, fidlist.GetNumberOfFiducials()):
-            if name == fidlist.GetNthFiducialLabel(i) :
-                print name, fidlist.GetNthFiducialLabel(i)
-                return True
-        return False
+        key = "Plane " + str(self.planeControlsId)        
+        self.planeControlsDictionary[key] = planeControls
 
-    def onPointModifiedEvent(self, obj, event):
-        self.logic.planeLandmarks(self.Landmark1ComboBox.currentIndex, self.Landmark2ComboBox.currentIndex, self.Landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+        self.planeComboBox1.addItem(key)
+        self.planeComboBox2.addItem(key)
     
     def onComputeBox(self):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
@@ -381,39 +282,18 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for i in range (3,numDisplayNode):
             self.slice = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelDisplayNode" )
             self.slice.SetSliceIntersectionVisibility(1)
-    
-    def addLandMarkClicked(self):
-        print "Add landmarks"
-        # # Place landmarks in the 3D scene
-        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1")
-
-        if nodes.GetNumberOfItems() == 0:
-            # The list does not exist so we create it
-            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
-            slicer.mrmlScene.AddNode(displayNode1)
-
-            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNode.SetName("P1")
-            slicer.mrmlScene.AddNode(fidNode)
-
-        ins = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        ins.SetCurrentInteractionMode(1)
-        
 
     
     def midPoint(self):
         print "Calculate midpoint "
     
-    def placePlaneClicked(self):
-        self.logic.planeLandmarks(self.Landmark1ComboBox.currentIndex, self.Landmark2ComboBox.currentIndex, self.Landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
-    
     def onCloseScene(self, obj, event):
-        self.logic.renderer.RemoveActor(self.logic.actor)
-        print "Scene Close"
+        keys = self.planeControlsDictionary.keys()
+        for i in range(0, len(keys)):
+            self.planeControlsDictionary[keys[i]].remove()
+            del self.planeControlsDictionary[keys[i]]
+        
         globals()[self.moduleName] = slicer.util.reloadScriptedModule(self.moduleName)
-
-    def onValueChanged(self):
-        self.placePlaneClicked()
     
     def angleValue(self):
         self.valueComboBox()
@@ -444,37 +324,271 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         greenslice = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeGreen')
         greenslice.SetWidgetVisible(False)
         
-        self.logic.defineAngle(colorPlane1,colorPlane2)
+        self.defineAngle(colorPlane1,colorPlane2)
     
     def modify(self, obj, event):
-        self.logic.defineAngle(self.planeComboBox1.currentText,self.planeComboBox2.currentText)
+        self.defineAngle(self.planeComboBox1.currentText, self.planeComboBox2.currentText)
 
+    def defineAngle(self, colorPlane1, colorPlane2):
+        print "DEFINE ANGLE"
+        print colorPlane1
+        if colorPlane1 in self.logic.ColorNodeCorrespondence:
+            slice1 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane1])
+            self.logic.getMatrix(slice1)
+            slice1.SetWidgetVisible(True)
+            matrix1 = self.logic.getMatrix(slice1)
+            normal1 = self.logic.defineNormal(matrix1)
+        else:
+            normal1 = self.planeControlsDictionary[colorPlane1].logic.N
+        
+        print colorPlane2
+        if colorPlane2 in self.logic.ColorNodeCorrespondence:
+            slice2 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane2])
+            self.logic.getMatrix(slice2)
+            slice2.SetWidgetVisible(True)
+            matrix2 = self.logic.getMatrix(slice2)
+            normal2 = self.logic.defineNormal(matrix2)
+        else:
+            normal2 = self.planeControlsDictionary[colorPlane2].logic.N
+
+        self.logic.getAngle(normal1, normal2)
+
+    def savePlanes(self):
+        tempDictionary = {}
+
+        sliceRed = slicer.util.getNode(self.logic.ColorNodeCorrespondence['red'])
+        tempDictionary["red"] = sliceRed.GetSliceToRAS()
+        
+        sliceYellow = slicer.util.getNode(self.logic.ColorNodeCorrespondence['yellow'])
+        tempDictionary["yellow"] = sliceYellow.GetSliceToRAS()
+        
+        sliceGreen = slicer.util.getNode(self.logic.ColorNodeCorrespondence['green'])
+        tempDictionary["green"] = sliceGreen.GetSliceToRAS()
+        
+        tempDictionary["customPlanes"] = {}
+
+        for key, plane in self.planeControlsDictionary.items():
+            tempDictionary["customPlanes"][plane.id] = plane.getFiducials()
+        
+        filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
+
+        if filename != "":
+            fileObj = open(filename, "wb")
+            pickle.dump(tempDictionary, fileObj)
+            fileObj.close()
+
+    def readPlane(self):
+        filename = qt.QFileDialog.getOpenFileName(parent=self,caption='Open file')
+        
+        if filename != "":
+            fileObj = open(filename, "rb")
+            tempDictionary = pickle.load( fileObj )
+
+            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed')
+            matList = tempDictionary["red"].tolist()
+            matNode = node.GetSliceToRAS()
+
+            for col in range(0, len(matList)):
+                for row in range(0, len(matList[col])):
+                    matNode.SetElement(col, row, matList[col][row])
+
+            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
+            matList = tempDictionary["yellow"].tolist()
+            matNode = node.GetSliceToRAS()
+
+            for col in range(0, len(matList)):
+                for row in range(0, len(matList[col])):
+                    matNode.SetElement(col, row, matList[col][row])
+
+            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeGreen')
+            matList = tempDictionary["green"].tolist()
+            matNode = node.GetSliceToRAS()
+
+            for col in range(0, len(matList)):
+                for row in range(0, len(matList[col])):
+                    matNode.SetElement(col, row, matList[col][row])
+
+
+            customPlanes = tempDictionary["customPlanes"]
+
+            for key, fidList in customPlanes.items():
+                self.addNewPlane(key)
+                tempkey = "Plane " + str(self.planeControlsId)
+                currentFidList = self.planeControlsDictionary[tempkey].logic.getFiducialList()
+                for i in range(0, len(fidList)):
+                    f = fidList[i]
+                    currentFidList.AddFiducial(f[0], f[1], f[2])
+
+            fileObj.close()
+
+
+class AnglePlanesWidgetPlaneControl(qt.QFrame):
+    def __init__(self, id):
+        qt.QFrame.__init__(self)
+        self.id = id
+
+        self.setLayout(qt.QFormLayout())
+
+        landmarkLayout = qt.QHBoxLayout()
+        
+
+        planeLabel = qt.QLabel('Plane ' + str(id) + ":")
+        landmarkLayout.addWidget(planeLabel)
+
+        self.logic = AnglePlanesLogic(id)
+
+        label1 = qt.QLabel(' L1:')
+        self.landmark1ComboBox = qt.QComboBox()
+        landmark1ComboBox = self.landmark1ComboBox
+        landmark1ComboBox.addItem("Select")
+        landmark1ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+
+        landmarkLayout.addWidget(label1)
+        landmarkLayout.addWidget(landmark1ComboBox)
+
+        label2 = qt.QLabel(' L2:')
+        self.landmark2ComboBox = qt.QComboBox()
+        landmark2ComboBox = self.landmark2ComboBox
+        landmark2ComboBox.addItem("Select")
+        landmark2ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+
+        landmarkLayout.addWidget(label2)
+        landmarkLayout.addWidget(landmark2ComboBox)
+
+        label3 = qt.QLabel(' L3:')
+        self.landmark3ComboBox = qt.QComboBox()
+        landmark3ComboBox = self.landmark3ComboBox
+        landmark3ComboBox.addItem("Select")
+        landmark3ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+
+        landmarkLayout.addWidget(label3)
+        landmarkLayout.addWidget(landmark3ComboBox)
+
+        addFiducialLabel = qt.QLabel('Add')
+        addFiducialButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
+        addFiducialButton.setFixedSize(50,25)
+        addFiducialButton.connect('clicked()', self.addLandMarkClicked)
+        addFiducialButton.setEnabled(True)
+        landmarkLayout.addWidget(addFiducialLabel)
+        landmarkLayout.addWidget(addFiducialButton)
+
+        #fiducial list for the plane
+
+        fidNode = self.logic.getFiducialList()
+        for i in range(0, fidNode.GetNumberOfFiducials()):
+            label = fidNode.GetNthFiducialLabel(i)
+            landmark1ComboBox.addItem(label)
+            landmark2ComboBox.addItem(label)
+            landmark3ComboBox.addItem(label)
+
+        fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
+        fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
+        fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
+
+        self.layout().addRow(landmarkLayout)
+
+        self.slider = ctk.ctkSliderWidget()
+        slider = self.slider
+        slider.singleStep = 0.1
+        slider.minimum = 0.1
+        slider.maximum = 10
+        slider.value = 1.0
+        slider.toolTip = "Set the size of your plane."
+
+        self.slideOpacity = ctk.ctkSliderWidget()
+        slideOpacity = self.slideOpacity
+        slideOpacity.singleStep = 0.1
+        slideOpacity.minimum = 0.1
+        slideOpacity.maximum = 1
+        slideOpacity.value = 1.0
+        slideOpacity.toolTip = "Set the opacity of your plane."
+
+        slider.connect('valueChanged(double)', self.placePlaneClicked)
+        slideOpacity.connect('valueChanged(double)', self.placePlaneClicked)
+
+        landmarkSliderLayout = qt.QHBoxLayout()
+        
+        label = qt.QLabel(' Size:')
+        label2 = qt.QLabel(' Opacity:')
+
+        landmarkSliderLayout.addWidget(label)
+        landmarkSliderLayout.addWidget(self.slider)
+        landmarkSliderLayout.addWidget(label2)
+        landmarkSliderLayout.addWidget(self.slideOpacity)
+
+        self.layout().addRow(landmarkSliderLayout)
+
+    def remove(self):
+        self.logic.remove()
+        
+    def onFiducialRemoved(self, obj, event):
+        fidlist = obj
+        
+        for i in range(1, self.landmark1ComboBox.count):
+            print i
+            found = self.fiducialInList(self.landmark1ComboBox.itemText(i), fidlist)
+            if not found:
+                self.landmark1ComboBox.removeItem(i)
+                self.landmark2ComboBox.removeItem(i)
+                self.landmark3ComboBox.removeItem(i)
+                break
+
+    def getFiducials(self):
+        
+        fidNode = self.logic.getFiducialList()
+
+        listCoord = list()
+
+        coord = numpy.zeros(3)
+        fidNode.GetNthFiducialPosition(int(self.landmark1ComboBox.currentIndex)-1, coord)
+        listCoord.append(coord)
+
+        fidNode.GetNthFiducialPosition(int(self.landmark2ComboBox.currentIndex)-1, coord)
+        listCoord.append(coord)
+
+        fidNode.GetNthFiducialPosition(int(self.landmark3ComboBox.currentIndex)-1, coord)
+        listCoord.append(coord)
+        
+        return listCoord
+
+    def placePlaneClicked(self):
+        self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex, self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+
+    def fiducialInList(self, name, fidlist):
+        for i in range(0, fidlist.GetNumberOfFiducials()):
+            if name == fidlist.GetNthFiducialLabel(i) :
+                print name, fidlist.GetNthFiducialLabel(i)
+                return True
+        return False
+
+    def onPointModifiedEvent(self, obj, event):
+        self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex, self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+
+    def addLandMarkClicked(self):
+        print "Add landmarks"
+        # # Place landmarks in the 3D scene
+        fidlist = self.logic.getFiducialList()
+        slicer.mrmlScene.AddNode(fidlist)
+        interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        interactionNode.SetCurrentInteractionMode(1)
+
+    def onFiducialAdded(self, obj, event):
+        fidlist = obj
+
+        label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
+        
+        self.landmark1ComboBox.addItem(label)
+        self.landmark2ComboBox.addItem(label)
+        self.landmark3ComboBox.addItem(label)
+    
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
-    def __init__(self):
+    def __init__(self, id = -1):
         self.ColorNodeCorrespondence = {'red': 'vtkMRMLSliceNodeRed',
             'yellow': 'vtkMRMLSliceNodeYellow',
             'green': 'vtkMRMLSliceNodeGreen'}
+        self.id = id
         self.initialize()
-
-
-    def getFiducialList(self):
-        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1")
-
-        if nodes.GetNumberOfItems() == 0:
-            # The list does not exist so we create it
-            displayNode1 = slicer.vtkMRMLMarkupsDisplayNode()
-            slicer.mrmlScene.AddNode(displayNode1)
-
-            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNode.SetName("P1")
-            slicer.mrmlScene.AddNode(fidNode)
-            
-        else:
-            #The list exists but the observers must be updated
-            fidNode = nodes.GetItemAsObject(0)
-
-        return fidNode
 
     def initialize(self):
         self.layoutManager=slicer.app.layoutManager()
@@ -491,6 +605,31 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.actor = vtk.vtkActor()
         self.renderer.AddViewProp(self.actor)
         self.renderWindow.AddRenderer(self.renderer)
+
+    def remove(self):
+        self.renderer.RemoveViewProp(self.actor)
+        self.renderer.Render()
+
+    def getFiducialList(self):
+        
+        P = self.getFiducialListName()
+        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', P)
+
+        if nodes.GetNumberOfItems() == 0:
+            # The list does not exist so we create it
+
+            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
+            fidNode.SetName(P)
+            slicer.mrmlScene.AddNode(fidNode)
+            
+        else:
+            #The list exists but the observers must be updated
+            fidNode = nodes.GetItemAsObject(0)
+
+        return fidNode
+
+    def getFiducialListName(self) :
+        return "P" + str(self.id)
     
     def getMatrix(self, slice):
         self.mat = slice.GetSliceToRAS()
@@ -525,208 +664,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         print normalVector1
         
         return normalVector1
-    
-    def savePlane(self):
-        sliceRed = slicer.util.getNode(self.ColorNodeCorrespondence['red'])
-        self.m_Red = self.getMatrix(sliceRed)
-        
-        sliceYellow = slicer.util.getNode(self.ColorNodeCorrespondence['yellow'])
-        self.m_Yellow = self.getMatrix(sliceYellow)
-        
-        sliceGreen = slicer.util.getNode(self.ColorNodeCorrespondence['green'])
-        self.m_Green = self.getMatrix(sliceGreen)
-        
-        
-        filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
-        fichier = open(filename, "w")
-        fichier.write("SliceToRAS Red Slice: \n")
-        fichier.write(str(self.m_Red) + '\n')
-        fichier.write('\n')
-        
-        fichier.write("SliceToRAS Yellow Slice: \n")
-        fichier.write(str(self.m_Yellow) + '\n')
-        fichier.write('\n')
-        
-        fichier.write("SliceToRAS Green Slice: \n")
-        fichier.write(str(self.m_Green) + '\n')
-        fichier.write('\n')
-        
-        fidNode = self.getFiducialList()
-        if fidNode:
-            
-            fichier.write("Fiducial: \n")
-            listCoord = list()
-            fidNode = self.getFiducialList()
-            self.coord = numpy.zeros(3)
-            fidNode.GetNthFiducialPosition(0, self.coord)
-            listCoord.insert(0,self.coord)
-            fichier.write(str(self.coord) + '\n')
-            fichier.write('\n')
-            
-            listCoord = list()
-            fidNode = self.getFiducialList()
-            self.coord = numpy.zeros(3)
-            fidNode.GetNthFiducialPosition(1, self.coord)
-            listCoord.insert(0,self.coord)
-            fichier.write(str(self.coord) + '\n')
-            fichier.write('\n')
-            
-            listCoord = list()
-            fidNode = self.getFiducialList()
-            self.coord = numpy.zeros(3)
-            fidNode.GetNthFiducialPosition(2, self.coord)
-            listCoord.insert(0,self.coord)
-            fichier.write(str(self.coord) + '\n')
-            fichier.write('\n')
-        
-        fichier.close()
-    
-    def readPlane(self):
-        filename = qt.QFileDialog.getOpenFileName(parent=self,caption='Open file')
-        print 'filename:', filename
-        fichier2 = open(filename, 'r')
-        fichier2.readline()
-        NodeRed = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed')
-        matRed = NodeRed.GetSliceToRAS()
-        
-        for i in range(0, 4):
-            ligne = fichier2.readline()
-            ligne = ligne.replace('[', '')
-            ligne = ligne.replace('   ', ' ')
-            ligne = ligne.replace(']', '')
-            ligne = ligne.replace('\n', '')
-            print ligne
-            items = ligne.split()
-            print items
-            for j in range(0, 4):
-                matRed.SetElement(i, j, float(items[j]))
-        
-        
-        print matRed
-        compare_red = 0
-        for i in range(0,4):
-            for j in range(0,4):
-                if matRed.GetElement(i,j) == self.matRed_init[i,j]:
-                    compare_red = compare_red + 1
-        
-        print compare_red
-        
-        if compare_red != 16:
-            self.redslice = slicer.util.getNode('vtkMRMLSliceNodeRed')
-            if self.red_plane_box.isChecked():
-                self.red_plane_box.setChecked(False)
-                self.redslice.SetWidgetVisible(False)
-            self.red_plane_box.setChecked(True)
-            self.redPlaneCheckBoxClicked()
-        
-        fichier2.readline()
-        fichier2.readline()
-        
-        
-        NodeGreen = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeGreen')
-        matGreen = NodeGreen.GetSliceToRAS()
-        for i in range (0,4):
-            ligne = fichier2.readline()
-            ligne = ligne.replace('[', '')
-            ligne = ligne.replace('   ', ' ')
-            ligne = ligne.replace(']', '')
-            ligne = ligne.replace('\n', '')
-            print ligne
-            items = ligne.split()
-            print items
-            for j in range(0, 4):
-                matGreen.SetElement(i, j, float(items[j]))
-        
-        
-        print matGreen
-        
-        
-        compare_green = 0
-        for i in range(0,4):
-            for j in range(0,4):
-                if matGreen.GetElement(i,j) == self.matGreen_init[i,j]:
-                    compare_green = compare_green + 1
-        
-        print compare_green
-        
-        if compare_green != 16:
-            self.greenslice = slicer.util.getNode('vtkMRMLSliceNodeGreen')
-            if self.green_plane_box.isChecked():
-                self.green_plane_box.setChecked(False)
-                self.greenslice.SetWidgetVisible(False)
-            
-            self.green_plane_box.setChecked(True)
-            self.greenPlaneCheckBoxClicked()
-        
-        
-        fichier2.readline()
-        fichier2.readline()
-        
-        displayNode = slicer.vtkMRMLMarkupsDisplayNode()
-        slicer.mrmlScene.AddNode(displayNode)
-        fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-        slicer.mrmlScene.AddNode(fidNode)
-        fidNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-        
-        ligne = fichier2.readline()
-        ligne = ligne.replace('[', '')
-        ligne = ligne.replace('   ', ' ')
-        ligne = ligne.replace(']', '')
-        ligne = ligne.replace('\n', '')
-        print ligne
-        items = ligne.split()
-        print items
-        
-        r = float(items[0])
-        a = float(items[1])
-        s = float(items[2])
-        fidNode.AddFiducial(r,a,s)
-        
-        fichier2.readline()
-        
-        displayNode = slicer.vtkMRMLMarkupsDisplayNode()
-        slicer.mrmlScene.AddNode(displayNode)
-        fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-        slicer.mrmlScene.AddNode(fidNode)
-        fidNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-        
-        ligne = fichier2.readline()
-        ligne = ligne.replace('[', '')
-        ligne = ligne.replace('   ', ' ')
-        ligne = ligne.replace(']', '')
-        ligne = ligne.replace('\n', '')
-        print ligne
-        items = ligne.split()
-        print items
-        
-        r = float(items[0])
-        a = float(items[1])
-        s = float(items[2])
-        fidNode.AddFiducial(r,a,s)
-        
-        fichier2.readline()
-        
-        displayNode = slicer.vtkMRMLMarkupsDisplayNode()
-        slicer.mrmlScene.AddNode(displayNode)
-        fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-        slicer.mrmlScene.AddNode(fidNode)
-        fidNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-        
-        ligne = fichier2.readline()
-        ligne = ligne.replace('[', '')
-        ligne = ligne.replace('   ', ' ')
-        ligne = ligne.replace(']', '')
-        ligne = ligne.replace('\n', '')
-        print ligne
-        items = ligne.split()
-        print items
-        
-        r = float(items[0])
-        a = float(items[1])
-        s = float(items[2])
-        fidNode.AddFiducial(r,a,s)
-        
-        fichier2.close()
     
     def getAngle(self, normalVect1, normalVect2):
         
@@ -847,33 +784,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         print normalVector1
         
         return normalVector1
-    
-    def defineAngle(self, colorPlane1, colorPlane2):
-        print "DEFINE ANGLE"
-        print colorPlane1
-        if colorPlane1 != "Landmarks":
-            self.slice1 = slicer.util.getNode(self.ColorNodeCorrespondence[colorPlane1])
-            self.getMatrix(self.slice1)
-            print "Slice test", self.slice1
-            self.slice1.SetWidgetVisible(True)
-            matrix1 = self.getMatrix(self.slice1)
-            normal1 = self.defineNormal(matrix1)
-        else:
-            normal1 = self.N
-        
-        print colorPlane2
-        if colorPlane2 != "Landmarks":
-            self.slice2 = slicer.util.getNode(self.ColorNodeCorrespondence[colorPlane2])
-            self.getMatrix(self.slice2)
-            print "Slice test", self.slice2
-            print "test"
-            self.slice2.SetWidgetVisible(True)
-            matrix2 = self.getMatrix(self.slice2)
-            normal2 = self.defineNormal(matrix2)
-        else:
-            normal2 = self.N
-        
-        self.getAngle(normal1, normal2)
     
     def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity):
         # Limit the number of 3 landmarks to define a plane
@@ -1011,8 +921,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.actor.SetMapper(mapper)
         self.actor.GetProperty().SetColor(0, 0.4, 0.8)
         self.actor.GetProperty().SetOpacity(sliderOpacity)
-
-        self.renderer.AddViewProp(self.actor)
+        
         self.renderer.Render()
         self.renderWindow.Render()
 
@@ -1031,6 +940,10 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         
         self.delayDisplay('Starting the test')
         logic = AnglePlanesLogic()
+
+
+        planeControlsDictionary = {}
+
 
         matrix = numpy.matrix([[0.572236,0.192876,0.797085,0],
                                [-0.819942,0.152968,0.551631,0],
