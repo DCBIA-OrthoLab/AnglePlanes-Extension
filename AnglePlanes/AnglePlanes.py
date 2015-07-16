@@ -1,7 +1,7 @@
 from __main__ import vtk, qt, ctk, slicer
 
 import numpy
-import SimpleITK as sitk
+
 from math import *
 
 
@@ -9,9 +9,11 @@ from math import *
 from slicer.ScriptedLoadableModule import *
 
 import os
-
-import sys
 import pickle
+
+from sys import maxint
+
+MAXINT = maxint
 
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
@@ -260,7 +262,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     
     def onComputeBox(self):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
-        bound = [sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize]
+        bound = [MAXINT, -MAXINT, MAXINT, -MAXINT, MAXINT, -MAXINT]
         for i in range (3,numNodes):
             self.elements = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelNode" )
             node = slicer.util.getNode(self.elements.GetName())
@@ -287,6 +289,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         print "dimension Z :", dimZ
         
         dimX = dimX + 10
+<<<<<<< HEAD
         dimY = dimY + 20
         dimZ = dimZ + 20
 
@@ -330,6 +333,44 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # for i in range (3,numDisplayNode):
         #     self.slice = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelDisplayNode" )
         #     self.slice.SetSliceIntersectionVisibility(1)
+=======
+        dimY = dimY + 10
+        dimZ = dimZ + 10
+
+        sampleVolumeNode = slicer.vtkMRMLScalarVolumeNode()
+        sampleVolumeNode = slicer.mrmlScene.AddNode(sampleVolumeNode)
+        imageData = vtk.vtkImageData()
+
+        # Do NOT set the spacing and the origin of imageData (vtkImageData)
+        # The spacing and the origin should only be set in the vtkMRMLScalarVolumeNode!!!!!!
+        imageData.SetDimensions(int(dimX), int(dimY), int(dimZ))
+        imageData.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+        extent = imageData.GetExtent()
+
+        for x in xrange(extent[0], extent[1]+1):
+            for y in xrange(extent[2], extent[3]+1):
+                for z in xrange(extent[4], extent[5]+1):
+                        imageData.SetScalarComponentFromDouble(x,y,z,0,0)
+
+        sampleVolumeNode.SetSpacing(1, 1, 1)
+        sampleVolumeNode.SetOrigin(bound[0], bound[2], bound[4])
+
+        sampleVolumeNode.SetName("Empty_volume")
+        sampleVolumeNode.SetAndObserveImageData(imageData)
+
+        sampleVolumeNode.SetLabelMap(1)
+        labelmapVolumeDisplayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
+        slicer.mrmlScene.AddNode(labelmapVolumeDisplayNode)
+        colorNode = slicer.util.getNode('GenericAnatomyColors')
+        labelmapVolumeDisplayNode.SetAndObserveColorNodeID(colorNode.GetID())
+        labelmapVolumeDisplayNode.VisibilityOn()
+        sampleVolumeNode.SetAndObserveDisplayNodeID(labelmapVolumeDisplayNode.GetID())
+
+        count = slicer.mrmlScene.GetNumberOfNodesByClass('vtkMRMLSliceCompositeNode')
+        for n in xrange(count):
+          compNode = slicer.mrmlScene.GetNthNodeByClass(n, 'vtkMRMLSliceCompositeNode')
+          compNode.SetBackgroundVolumeID(sampleVolumeNode.GetID())
+>>>>>>> boundingBox
         
     def onAddMidPoint(self):
         
