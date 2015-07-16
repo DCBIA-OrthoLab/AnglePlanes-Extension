@@ -1037,49 +1037,54 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         self.test_AnglePlanes()
     
     def test_AnglePlanes(self):
-        
+
         self.delayDisplay('Starting the test')
-        logic = AnglePlanesLogic()
+
+        widget = AnglePlanesWidget()
+
+        widget.addNewPlane()
+        widget.addNewPlane()
+
+        fidlist1 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1").GetItemAsObject(0)
+
+        fidlist1.AddFiducial(10,10,10)
+        fidlist1.AddFiducial(20,20,20)
+        fidlist1.AddFiducial(10,20,30)
+
+        fidlist2 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P2").GetItemAsObject(0)
+
+        fidlist2.AddFiducial(50,50,50)
+        fidlist2.AddFiducial(40,20,80)
+        fidlist2.AddFiducial(10,40,20)
 
 
-        planeControlsDictionary = {}
+        widget.planeControlsDictionary["Plane 1"].landmark1ComboBox.setCurrentIndex(1)
+        widget.planeControlsDictionary["Plane 1"].landmark2ComboBox.setCurrentIndex(2)
+        widget.planeControlsDictionary["Plane 1"].landmark3ComboBox.setCurrentIndex(3)
+
+        widget.planeControlsDictionary["Plane 2"].landmark1ComboBox.setCurrentIndex(1)
+        widget.planeControlsDictionary["Plane 2"].landmark2ComboBox.setCurrentIndex(2)
+        widget.planeControlsDictionary["Plane 2"].landmark3ComboBox.setCurrentIndex(3)
+
+        widget.planeComboBox1.setCurrentIndex(3)
+        widget.planeComboBox2.setCurrentIndex(4)
+
+        widget.angleValue()
+
+        test = widget.logic.angle_degre_RL != 59.06 or widget.logic.angle_degre_RL_comp != 120.94 or widget.logic.angle_degre_SI != 12.53 or widget.logic.angle_degre_SI_comp != 167.47 or widget.logic.angle_degre_AP != 82.56 or widget.logic.angle_degre_AP_comp != 97.44
+
+        if test:
+
+            print "", "Angle", "Complementary"
+            print "R-L-View", self.logic.angle_degre_RL, self.logic.angle_degre_RL_comp
+            print "S-I-View", self.logic.angle_degre_SI, self.logic.angle_degre_SI_comp
+            print "A-P-View", self.logic.angle_degre_AP, self.logic.angle_degre_AP_comp
+            self.delayDisplay('Test Failure!')
+
+        else:
+            self.delayDisplay('Test passed!')
 
 
-        matrix = numpy.matrix([[0.572236,0.192876,0.797085,0],
-                               [-0.819942,0.152968,0.551631,0],
-                               [0.0155322,0.969226,-0.245681,0],
-                               [0,0,0,1]])
-
-        normalVector1 = logic.defineNormal(matrix)
-
-        fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-        slicer.mrmlScene.AddNode(fidNode)
-
-        r1=32
-        a1=10
-        s1=4
-
-        r2=-9
-        a2=7
-        s2=19
-
-        r3=9
-        a3=-4
-        s3=46
-
-        fidNode.AddFiducial(r1,a1,s1)
-        fidNode.AddFiducial(r2,a2,s2)
-        fidNode.AddFiducial(r3,a3,s3)
-
-        logic.planeLandmarks(1,2,3,1,1)
-
-        GA = numpy.matrix([[5],[-2],[3]])
-        GB = numpy.matrix([[6],[1],[9]])
-
-        Normal = logic.normalLandmarks(GA, GB)
-
-        logic.getAngle(normalVector1, Normal)
-
-        self.delayDisplay('Test passed!')
-
+        
+        widget.parent.close()
 
