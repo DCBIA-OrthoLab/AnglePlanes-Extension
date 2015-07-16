@@ -239,7 +239,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox2.connect('currentIndexChanged(QString)', self.valueComboBox)
 
         save.connect('clicked(bool)', self.savePlanes)
-        read.connect('clicked(bool)', self.readPlane)
+        read.connect('clicked(bool)', self.readPlanes)
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
 
@@ -456,39 +456,42 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         self.logic.getAngle(normal1, normal2)
 
-    def savePlanes(self):
+    def savePlanes(self, filename = ""):
         tempDictionary = {}
 
         sliceRed = slicer.util.getNode(self.logic.ColorNodeCorrespondence['red'])
-        tempDictionary["red"] = sliceRed.GetSliceToRAS()
+        tempDictionary["red"] = self.logic.getMatrix(sliceRed).tolist()
         
         sliceYellow = slicer.util.getNode(self.logic.ColorNodeCorrespondence['yellow'])
-        tempDictionary["yellow"] = sliceYellow.GetSliceToRAS()
+        tempDictionary["yellow"] = self.logic.getMatrix(sliceYellow).tolist()
         
         sliceGreen = slicer.util.getNode(self.logic.ColorNodeCorrespondence['green'])
-        tempDictionary["green"] = sliceGreen.GetSliceToRAS()
+        tempDictionary["green"] = self.logic.getMatrix(sliceGreen).tolist()
         
         tempDictionary["customPlanes"] = {}
 
         for key, plane in self.planeControlsDictionary.items():
             tempDictionary["customPlanes"][plane.id] = plane.getFiducials()
         
-        filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
+        if filename == "":
+            filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
 
         if filename != "":
             fileObj = open(filename, "wb")
             pickle.dump(tempDictionary, fileObj)
             fileObj.close()
 
-    def readPlane(self):
-        filename = qt.QFileDialog.getOpenFileName(parent=self,caption='Open file')
+    def readPlanes(self, filename=""):
+
+        if filename == "":
+            filename = qt.QFileDialog.getOpenFileName(parent=self,caption='Open file')
         
         if filename != "":
             fileObj = open(filename, "rb")
             tempDictionary = pickle.load( fileObj )
 
             node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed')
-            matList = tempDictionary["red"].tolist()
+            matList = tempDictionary["red"]
             matNode = node.GetSliceToRAS()
 
             for col in range(0, len(matList)):
@@ -496,7 +499,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                     matNode.SetElement(col, row, matList[col][row])
 
             node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
-            matList = tempDictionary["yellow"].tolist()
+            matList = tempDictionary["yellow"]
             matNode = node.GetSliceToRAS()
 
             for col in range(0, len(matList)):
@@ -504,7 +507,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                     matNode.SetElement(col, row, matList[col][row])
 
             node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeGreen')
-            matList = tempDictionary["green"].tolist()
+            matList = tempDictionary["green"]
             matNode = node.GetSliceToRAS()
 
             for col in range(0, len(matList)):
@@ -1056,11 +1059,13 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
 
         self.delayDisplay('Starting the test')
 
+        self.delayDisplay('Adding planes')
         widget = AnglePlanesWidget()
 
         widget.addNewPlane()
         widget.addNewPlane()
 
+        self.delayDisplay('Adding fiducials')
         fidlist1 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1").GetItemAsObject(0)
 
         fidlist1.AddFiducial(10,10,10)
@@ -1072,8 +1077,15 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         fidlist2.AddFiducial(50,50,50)
         fidlist2.AddFiducial(40,20,80)
         fidlist2.AddFiducial(10,40,20)
+        
 
+        self.delayDisplay('Saving planes')
+        widget.savePlanes("test.p")
 
+        self.delayDisplay('Loading planes')
+        widget.readPlanes("test.p")
+
+        self.delayDisplay('Selecting fiducials')
         widget.planeControlsDictionary["Plane 1"].landmark1ComboBox.setCurrentIndex(1)
         widget.planeControlsDictionary["Plane 1"].landmark2ComboBox.setCurrentIndex(2)
         widget.planeControlsDictionary["Plane 1"].landmark3ComboBox.setCurrentIndex(3)
@@ -1082,13 +1094,16 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         widget.planeControlsDictionary["Plane 2"].landmark2ComboBox.setCurrentIndex(2)
         widget.planeControlsDictionary["Plane 2"].landmark3ComboBox.setCurrentIndex(3)
 
-        widget.planeComboBox1.setCurrentIndex(3)
-        widget.planeComboBox2.setCurrentIndex(4)
+        self.delayDisplay('Selecting planes')
+        widget.planeComboBox1.setCurrentIndex(5)
+        widget.planeComboBox2.setCurrentIndex(6)
 
+        self.delayDisplay('Calculating angle')
         widget.angleValue()
 
         test = widget.logic.angle_degre_RL != 59.06 or widget.logic.angle_degre_RL_comp != 120.94 or widget.logic.angle_degre_SI != 12.53 or widget.logic.angle_degre_SI_comp != 167.47 or widget.logic.angle_degre_AP != 82.56 or widget.logic.angle_degre_AP_comp != 97.44
 
+        self.delayDisplay('Testing angles')
         if test:
 
             print "", "Angle", "Complementary"
@@ -1099,8 +1114,6 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
 
         else:
             self.delayDisplay('Test passed!')
-
-
         
         widget.parent.close()
 
