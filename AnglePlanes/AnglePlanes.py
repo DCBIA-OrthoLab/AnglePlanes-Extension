@@ -310,9 +310,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for i in range (3,numDisplayNode):
             self.slice = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelDisplayNode" )
             self.slice.SetSliceIntersectionVisibility(1)
-
-    
-    
         
     def onAddMidPoint(self):
         
@@ -339,8 +336,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         coord /= 2
 
         fidlist1.AddFiducial(coord[0], coord[1], coord[2])
-        fidlist2.AddFiducial(coord[0], coord[1], coord[2])
-        fidlist2.SetNthFiducialVisibility(fidlist2.GetNumberOfFiducials() - 1, False)
+
+        if p1 != p2:
+            fidlist2.AddFiducial(coord[0], coord[1], coord[2])
+            fidlist2.SetNthFiducialVisibility(fidlist2.GetNumberOfFiducials() - 1, False)
         
 
     def onFiducialAddedMidPoint(self, obj, event):
