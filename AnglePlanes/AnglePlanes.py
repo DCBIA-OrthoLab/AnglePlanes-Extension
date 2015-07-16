@@ -44,12 +44,12 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.logic = AnglePlanesLogic()
         self.planeControlsId = 0
         self.planeControlsDictionary = {}
+        self.midPointFiducialDictionaryID = {}
         # self.logic.initializePlane()
         
         self.n_vector = numpy.matrix([[0], [0], [1], [1]])
 
         self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        print "setup"
         #Definition of the 2 planes
 
         # Collapsible button -- Scene Description
@@ -95,7 +95,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.managePlanesFormLayout = qt.QFormLayout(self.CollapsibleButton)
         self.CollapsibleButton.checked = True
 
-        # Collapsible button
+        # Add planes and manage landmark addition to each plane
 
         addNewPlaneLayout = qt.QHBoxLayout()
         addPlaneLabel = qt.QLabel('Add new plane')
@@ -108,7 +108,35 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         
         self.managePlanesFormLayout.addRow(addNewPlaneLayout)
 
-        # MIDPOINT PART
+        #        ----------------- Compute Mid Point -------------   
+        self.midPointGroupBox = ctk.ctkCollapsibleButton()
+        self.midPointGroupBox.setText('Define middle point between two landmarks') 
+        self.midPointGroupBox.collapsed = True
+        self.parent.layout().addWidget(self.midPointGroupBox)
+        self.landmarkComboBox1MidPoint = qt.QComboBox()
+        self.landmarkComboBox2MidPoint = qt.QComboBox()
+        landmark1Layout = qt.QFormLayout()
+        landmark1Layout.addRow('Landmark A: ', self.landmarkComboBox1MidPoint)
+        landmark1Layout.addRow('Landmark B: ', self.landmarkComboBox2MidPoint)
+
+        self.defineMiddlePointButton = qt.QPushButton(' Add middle point ')
+        # self.midPointOnSurfaceCheckBox = qt.QCheckBox('On Surface')
+        # self.midPointOnSurfaceCheckBox.setChecked(False)
+        exportLayout_1 = qt.QFormLayout()
+        # exportLayout_1.addRow(self.midPointOnSurfaceCheckBox, self.defineMiddlePointButton)
+        exportLayout_1.addRow(self.defineMiddlePointButton)
+        self.midPointLayout = qt.QVBoxLayout()
+        self.midPointLayout.addLayout(landmark1Layout)
+        self.midPointLayout.addLayout(exportLayout_1)
+        self.midPointGroupBox.setLayout(self.midPointLayout)
+
+        self.defineMiddlePointButton.connect('clicked()', self.onAddMidPoint)
+        # self.landmarkComboBox1MidPoint.connect('currentIndexChanged(int)', self.onUpdateMidPoint)
+        # self.landmarkComboBox2MidPoint.connect('currentIndexChanged(int)', self.onUpdateMidPoint)
+
+
+
+        # -------- Calculate angles between planes ------------
 
         self.CollapsibleButtonPlane = ctk.ctkCollapsibleButton()
         self.CollapsibleButtonPlane.text = "Choose planes"
@@ -218,7 +246,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         else:
             self.planeControlsId += 1
 
-        planeControls = AnglePlanesWidgetPlaneControl(self.planeControlsId)
+        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId)
         self.managePlanesFormLayout.addRow(planeControls)
 
         key = "Plane " + str(self.planeControlsId)        
@@ -284,8 +312,66 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.slice.SetSliceIntersectionVisibility(1)
 
     
-    def midPoint(self):
-        print "Calculate midpoint "
+    
+        
+    def onAddMidPoint(self):
+        
+        f1 = self.landmarkComboBox1MidPoint.currentText
+        f2 = self.landmarkComboBox2MidPoint.currentText
+
+        p1 = f1[0:f1.find("-")]
+        print p1
+
+        fidlist1 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', p1).GetItemAsObject(0)
+        index1 = fidlist1.GetMarkupIndexByID(self.midPointFiducialDictionaryID[f1])
+        coord1 = numpy.zeros(3)
+        fidlist1.GetNthFiducialPosition(index1, coord1)
+
+        p2 = f2[0:f2.find("-")]
+        print p2
+
+        fidlist2 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', p2).GetItemAsObject(0)
+        index2 = fidlist2.GetMarkupIndexByID(self.midPointFiducialDictionaryID[f2])
+        coord2 = numpy.zeros(3)
+        fidlist2.GetNthFiducialPosition(index2, coord2)
+
+        coord = coord1 + coord2
+        coord /= 2
+
+        fidlist1.AddFiducial(coord[0], coord[1], coord[2])
+        
+
+    def onFiducialAddedMidPoint(self, obj, event):
+        fidlist = obj
+
+        label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
+
+        self.midPointFiducialDictionaryID[label] = fidlist.GetNthMarkupID(fidlist.GetNumberOfFiducials() - 1)
+
+        self.landmarkComboBox1MidPoint.addItem(label)
+        self.landmarkComboBox2MidPoint.addItem(label)
+
+    def onFiducialRemovedMidPoint(self, obj, event):
+        fidlist = obj
+
+        print obj
+        
+        for i in range(1, self.landmarkComboBox1MidPoint.count):
+            print i
+            label = self.landmarkComboBox1MidPoint.itemText(i)
+            found = self.fiducialInListMidPoint(label, fidlist)
+            if not found:
+                del self.midPointFiducialDictionaryID[label]
+                self.landmarkComboBox1MidPoint.removeItem(i)
+                self.landmarkComboBox2MidPoint.removeItem(i)
+                break
+
+    def fiducialInListMidPoint(self, name, fidlist):
+        for i in range(0, fidlist.GetNumberOfFiducials()):
+            if name == fidlist.GetNthFiducialLabel(i) :
+                return True
+        return False
+
     
     def onCloseScene(self, obj, event):
         keys = self.planeControlsDictionary.keys()
@@ -421,9 +507,12 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
             fileObj.close()
 
-
+# This widget controls each of the planes that are added to the interface. 
+# The widget contains its own logic, i.e. an object of AnglePlanesLogic. 
+# Each plane contains a separate fiducial list. The planes are named P1, P2, ..., PN. The landmarks are named
+# P1-1, P1-2, P1-N. 
 class AnglePlanesWidgetPlaneControl(qt.QFrame):
-    def __init__(self, id):
+    def __init__(self, anglePlanes, id):
         qt.QFrame.__init__(self)
         self.id = id
 
@@ -481,9 +570,20 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
             landmark2ComboBox.addItem(label)
             landmark3ComboBox.addItem(label)
 
+            anglePlanes.landmarkComboBox1MidPoint.addItem(label)
+            anglePlanes.landmarkComboBox2MidPoint.addItem(label)
+            anglePlanes.midPointFiducialDictionaryID[label] = fidNode.GetNthMarkupID(i)
+
         fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
         fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
         fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
+
+
+        # This observers are in AnglePlaneWidgets, they listen to any fiducial being added
+        # 
+        fidNode.AddObserver(fidNode.MarkupAddedEvent, anglePlanes.onFiducialAddedMidPoint)
+        fidNode.AddObserver(fidNode.MarkupRemovedEvent, anglePlanes.onFiducialRemovedMidPoint)
+
 
         self.layout().addRow(landmarkLayout)
 
@@ -557,7 +657,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
     def fiducialInList(self, name, fidlist):
         for i in range(0, fidlist.GetNumberOfFiducials()):
             if name == fidlist.GetNthFiducialLabel(i) :
-                print name, fidlist.GetNthFiducialLabel(i)
                 return True
         return False
 
