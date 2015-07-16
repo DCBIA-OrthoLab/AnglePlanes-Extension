@@ -19,7 +19,7 @@ class AnglePlanes(ScriptedLoadableModule):
         parent.title = "Angle Planes"
         parent.categories = ["Shape Analysis"]
         parent.dependencies = []
-        parent.contributors = ["Julia Lopinto"]
+        parent.contributors = ["Julia Lopinto", "Juan Carlos Prieto"]
         parent.helpText = """
             This Module is used to calculate the angle between two planes by using the normals.
             The user gets the choice to use two planes which are already implemented on Slicer
