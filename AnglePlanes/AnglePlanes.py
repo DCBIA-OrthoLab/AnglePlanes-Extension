@@ -4,10 +4,13 @@ import numpy
 import SimpleITK as sitk
 from math import *
 
+
+
 from slicer.ScriptedLoadableModule import *
 
 import os
 
+import sys
 import pickle
 
 class AnglePlanes(ScriptedLoadableModule):
@@ -257,12 +260,22 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     
     def onComputeBox(self):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+        bound = [sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize, sys.maxsize, -sys.maxsize]
         for i in range (3,numNodes):
             self.elements = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelNode" )
+            node = slicer.util.getNode(self.elements.GetName())
+            polydata = node.GetPolyData()
+            tempbound = polydata.GetBounds()
+            bound[0] = min(bound[0], tempbound[0])
+            bound[2] = min(bound[2], tempbound[2])
+            bound[4] = min(bound[4], tempbound[4])
+
+            bound[1] = max(bound[1], tempbound[1])
+            bound[3] = max(bound[3], tempbound[3])
+            bound[5] = max(bound[5], tempbound[5])
+
         #--------------------------- Box around the model --------------------------#
-        node = slicer.util.getNode(self.elements.GetName())
-        polydata = node.GetPolyData()
-        bound = polydata.GetBounds()
+        
         print "bound", bound
         
         dimX = bound[1]-bound[0]
@@ -277,8 +290,11 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         dimY = dimY + 20
         dimZ = dimZ + 20
         
-        center = polydata.GetCenter()
-        print "Center polydata :", center
+        center = [0, 0, 0]
+        center[0] = (bound[1]+bound[0])/2
+        center[1] = (bound[3]+bound[2])/2
+        center[2] = (bound[5]+bound[4])/2
+
         
         # Creation of an Image
         self.image = sitk.Image(int(dimX), int(dimY), int(dimZ), sitk.sitkInt16)
