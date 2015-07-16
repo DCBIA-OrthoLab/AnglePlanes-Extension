@@ -238,8 +238,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox1.connect('currentIndexChanged(QString)', self.valueComboBox)
         self.planeComboBox2.connect('currentIndexChanged(QString)', self.valueComboBox)
 
-        save.connect('clicked(bool)', self.savePlanes)
-        read.connect('clicked(bool)', self.readPlanes)
+        save.connect('clicked(bool)', self.onSavePlanes)
+        read.connect('clicked(bool)', self.onReadPlanes)
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
 
@@ -289,43 +289,47 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         dimX = dimX + 10
         dimY = dimY + 20
         dimZ = dimZ + 20
+
+        red = slicer.util.getNode('vtkMRMLSliceNodeRed')
+        red.SetDimensions(dimX, dimY, dimZ)
+        red.SetOrigin(bound[0], bound[1], bound[2])
         
-        center = [0, 0, 0]
-        center[0] = (bound[1]+bound[0])/2
-        center[1] = (bound[3]+bound[2])/2
-        center[2] = (bound[5]+bound[4])/2
+        # center = [0, 0, 0]
+        # center[0] = (bound[1]+bound[0])/2
+        # center[1] = (bound[3]+bound[2])/2
+        # center[2] = (bound[5]+bound[4])/2
 
         
-        # Creation of an Image
-        self.image = sitk.Image(int(dimX), int(dimY), int(dimZ), sitk.sitkInt16)
+        # # Creation of an Image
+        # self.image = sitk.Image(int(dimX), int(dimY), int(dimZ), sitk.sitkInt16)
         
-        dir = (-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
-        self.image.SetDirection(dir)
+        # dir = (-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+        # self.image.SetDirection(dir)
         
-        spacing = (1,1,1)
-        self.image.SetSpacing(spacing)
+        # spacing = (1,1,1)
+        # self.image.SetSpacing(spacing)
         
-        tab = [-center[0]+dimX/2,-center[1]+dimY/2,center[2]-dimZ/2]
-        print tab
-        self.image.SetOrigin(tab)
-        
-        
-        writer = sitk.ImageFileWriter()
-        tempPath = slicer.app.temporaryPath
-        filename = "Box.nrrd"
-        filenameFull=os.path.join(tempPath,filename)
-        print filenameFull
-        writer.SetFileName(str(filenameFull))
-        writer.Execute(self.image)
+        # tab = [-center[0]+dimX/2,-center[1]+dimY/2,center[2]-dimZ/2]
+        # print tab
+        # self.image.SetOrigin(tab)
         
         
-        slicer.util.loadVolume(filenameFull)
+        # writer = sitk.ImageFileWriter()
+        # tempPath = slicer.app.temporaryPath
+        # filename = "Box.nrrd"
+        # filenameFull=os.path.join(tempPath,filename)
+        # print filenameFull
+        # writer.SetFileName(str(filenameFull))
+        # writer.Execute(self.image)
         
-        #------------------------ Slice Intersection Visibility ----------------------#
-        numDisplayNode = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelDisplayNode")
-        for i in range (3,numDisplayNode):
-            self.slice = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelDisplayNode" )
-            self.slice.SetSliceIntersectionVisibility(1)
+        
+        # slicer.util.loadVolume(filenameFull)
+        
+        # #------------------------ Slice Intersection Visibility ----------------------#
+        # numDisplayNode = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelDisplayNode")
+        # for i in range (3,numDisplayNode):
+        #     self.slice = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelDisplayNode" )
+        #     self.slice.SetSliceIntersectionVisibility(1)
         
     def onAddMidPoint(self):
         
@@ -456,7 +460,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         self.logic.getAngle(normal1, normal2)
 
-    def savePlanes(self, filename = ""):
+    def onSavePlanes(self):
+        self.savePlanes()
+
+    def savePlanes(self, filename = None):
         tempDictionary = {}
 
         sliceRed = slicer.util.getNode(self.logic.ColorNodeCorrespondence['red'])
@@ -472,8 +479,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         for key, plane in self.planeControlsDictionary.items():
             tempDictionary["customPlanes"][plane.id] = plane.getFiducials()
-        
-        if filename == "":
+        print filename
+        if filename is None:
             filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
 
         if filename != "":
@@ -481,9 +488,12 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             pickle.dump(tempDictionary, fileObj)
             fileObj.close()
 
-    def readPlanes(self, filename=""):
+    def onReadPlanes(self):
+        self.readPlanes()
 
-        if filename == "":
+    def readPlanes(self, filename=None):
+
+        if filename is None:
             filename = qt.QFileDialog.getOpenFileName(parent=self,caption='Open file')
         
         if filename != "":
