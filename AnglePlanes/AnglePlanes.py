@@ -23,16 +23,22 @@ class ModelAddedClass(VTKObservationMixin):
     def __init__(self, anglePlanes):
         VTKObservationMixin.__init__(self)
         self.addObserver(slicer.mrmlScene, slicer.vtkMRMLScene.NodeAddedEvent, self.nodeAddedCallback)
+        self.addObserver(slicer.mrmlScene, slicer.vtkMRMLScene.NodeRemovedEvent, self.nodeRemovedCallback)
         self.anglePlanes = anglePlanes
 
     @vtk.calldata_type(vtk.VTK_OBJECT)
     def nodeAddedCallback(self, caller, eventId, callData):
-        if callData.GetClassName() == "vtkMRMLModelNode":
-            self.callData = callData
-            qt.QTimer.singleShot(5, self.modelLoadingCompleted)
+        if isinstance(callData, slicer.vtkMRMLModelNode):
+            self.addObserver(callData, callData.PolyDataModifiedEvent, self.onModelNodePolyDataModified)
 
-    def modelLoadingCompleted(self):
-        self.anglePlanes.addModelPointLocator(self.callData.GetName(), self.callData.GetPolyData())
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def nodeRemovedCallback(self, caller, eventId, callData):
+        if isinstance(callData, slicer.vtkMRMLModelNode):
+            self.removeObserver(callData, callData.PolyDataModifiedEvent, self.onModelNodePolyDataModified)
+            self.anglePlanes.removeModelPointLocator(callData.GetName())
+
+    def onModelNodePolyDataModified(self, caller, eventId):
+        self.anglePlanes.addModelPointLocator(caller.GetName(), caller.GetPolyData())        
         
 
 class AnglePlanes(ScriptedLoadableModule):
@@ -276,6 +282,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         
         ModelAddedClass(self)
 
+    def removeModelPointLocator(self, name):
+        if name in self.pointLocatorDictionary:
+            print("Removing point locator {0}".format(name))
+            del self.pointLocatorDictionary[name]
 
     def addModelPointLocator(self, name, polydata):
 
