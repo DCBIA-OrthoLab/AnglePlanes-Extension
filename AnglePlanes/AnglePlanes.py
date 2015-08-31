@@ -11,9 +11,35 @@ from slicer.ScriptedLoadableModule import *
 import os
 import pickle
 
+import time
+
 from sys import maxint
 
 MAXINT = maxint
+
+from slicer.util import VTKObservationMixin
+
+class ModelAddedClass(VTKObservationMixin):
+    def __init__(self, anglePlanes):
+        VTKObservationMixin.__init__(self)
+        self.addObserver(slicer.mrmlScene, slicer.vtkMRMLScene.NodeAddedEvent, self.nodeAddedCallback)
+        self.addObserver(slicer.mrmlScene, slicer.vtkMRMLScene.NodeRemovedEvent, self.nodeRemovedCallback)
+        self.anglePlanes = anglePlanes
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def nodeAddedCallback(self, caller, eventId, callData):
+        if isinstance(callData, slicer.vtkMRMLModelNode):
+            self.addObserver(callData, callData.PolyDataModifiedEvent, self.onModelNodePolyDataModified)
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def nodeRemovedCallback(self, caller, eventId, callData):
+        if isinstance(callData, slicer.vtkMRMLModelNode):
+            self.removeObserver(callData, callData.PolyDataModifiedEvent, self.onModelNodePolyDataModified)
+            self.anglePlanes.removeModelPointLocator(callData.GetName())
+
+    def onModelNodePolyDataModified(self, caller, eventId):
+        self.anglePlanes.addModelPointLocator(caller.GetName(), caller.GetPolyData())        
+        
 
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
@@ -77,10 +103,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         header.setVisible(True)
         self.loadFormLayout.addWidget(treeView)
 
-        numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
-        for i in range (3,numNodes):
-            self.elements = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelNode" )
-            print self.elements.GetName()
+        # numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+        # for i in range (3,numNodes):
+        #     self.elements = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelNode" )
+        #     print self.elements.GetName()
 
         # Add vertical spacer
         self.layout.addStretch(1)
@@ -245,13 +271,41 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                                                                                                                 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
 
+
+        self.pointLocatorDictionary = {}
+
+
+        numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+        for i in range (3, numNodes):
+            modelnode = slicer.mrmlScene.GetNthNodeByClass(i,"vtkMRMLModelNode" )
+            self.addModelPointLocator(modelnode.GetName(), modelnode.GetPolyData())
+        
+        ModelAddedClass(self)
+
+    def removeModelPointLocator(self, name):
+        if name in self.pointLocatorDictionary:
+            print("Removing point locator {0}".format(name))
+            del self.pointLocatorDictionary[name]
+
+    def addModelPointLocator(self, name, polydata):
+
+        if not name in self.pointLocatorDictionary:
+
+            print "Adding point locator: {0}".format(name)
+            pointLocator = vtk.vtkPointLocator()
+            pointLocator.SetDataSet(polydata)
+            pointLocator.AutomaticOn()
+            pointLocator.BuildLocator()
+
+            self.pointLocatorDictionary[name] = pointLocator
+
     def addNewPlane(self, keyLoad = -1):
         if keyLoad != -1:
             self.planeControlsId = keyLoad
         else:
             self.planeControlsId += 1
 
-        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId)
+        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId, self.pointLocatorDictionary)
         self.managePlanesFormLayout.addRow(planeControls)
 
         key = "Plane " + str(self.planeControlsId)        
@@ -278,15 +332,15 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         #--------------------------- Box around the model --------------------------#
         
-        print "bound", bound
+        # print "bound", bound
         
         dimX = bound[1]-bound[0]
         dimY = bound[3]-bound[2]
         dimZ = bound[5]-bound[4]
         
-        print "dimension X :", dimX
-        print "dimension Y :", dimY
-        print "dimension Z :", dimZ
+        # print "dimension X :", dimX
+        # print "dimension Y :", dimY
+        # print "dimension Z :", dimZ
         
         dimX = dimX + 10
         dimY = dimY + 10
@@ -522,12 +576,12 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
             customPlanes = tempDictionary["customPlanes"]
 
-            for key, fidList in customPlanes.items():
+            for key, fidlist in customPlanes.items():
                 self.addNewPlane(key)
                 tempkey = "Plane " + str(self.planeControlsId)
                 currentFidList = self.planeControlsDictionary[tempkey].logic.getFiducialList()
-                for i in range(0, len(fidList)):
-                    f = fidList[i]
+                for i in range(0, len(fidlist)):
+                    f = fidlist[i]
                     currentFidList.AddFiducial(f[0], f[1], f[2])
 
             fileObj.close()
@@ -537,14 +591,14 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 # Each plane contains a separate fiducial list. The planes are named P1, P2, ..., PN. The landmarks are named
 # P1-1, P1-2, P1-N. 
 class AnglePlanesWidgetPlaneControl(qt.QFrame):
-    def __init__(self, anglePlanes, id):
+    def __init__(self, anglePlanes, id, pointlocatordictionary):
         qt.QFrame.__init__(self)
         self.id = id
 
         self.setLayout(qt.QFormLayout())
+        self.pointLocatorDictionary = pointlocatordictionary
 
         landmarkLayout = qt.QHBoxLayout()
-        
 
         planeLabel = qt.QLabel('Plane ' + str(id) + ":")
         landmarkLayout.addWidget(planeLabel)
@@ -601,8 +655,8 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
         fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
         fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
-        fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
-
+        
+        self.setPointModifiedEventId = fidNode.AddObserver(fidNode.PointModifiedEvent, self.onPointModifiedEvent)
 
         # This observers are in AnglePlaneWidgets, they listen to any fiducial being added
         # 
@@ -641,6 +695,12 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         landmarkSliderLayout.addWidget(label2)
         landmarkSliderLayout.addWidget(self.slideOpacity)
 
+        self.surfaceDeplacementCheckBox = qt.QCheckBox("On Surface")
+        self.surfaceDeplacementCheckBox.setChecked(True)
+        self.surfaceDeplacementCheckBox.connect('stateChanged(int)', self.onSurfaceDeplacementStateChanged)
+
+        landmarkSliderLayout.addWidget(self.surfaceDeplacementCheckBox)
+
         self.layout().addRow(landmarkSliderLayout)
 
     def remove(self):
@@ -650,7 +710,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         fidlist = obj
         
         for i in range(1, self.landmark1ComboBox.count):
-            print i
+            #print i
             found = self.fiducialInList(self.landmark1ComboBox.itemText(i), fidlist)
             if not found:
                 self.landmark1ComboBox.removeItem(i)
@@ -677,7 +737,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         return listCoord
 
     def placePlaneClicked(self):
-        self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex, self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+        self.update()
 
     def fiducialInList(self, name, fidlist):
         for i in range(0, fidlist.GetNumberOfFiducials()):
@@ -685,11 +745,65 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
                 return True
         return False
 
+    def projectAllFiducials(self):
+        fidlist = self.logic.getFiducialList()
+        for i in range(0, fidlist.GetNumberOfFiducials()):
+            self.projectFiducialOnClosestSurface(fidlist, i, self.pointLocatorDictionary)
+
     def onPointModifiedEvent(self, obj, event):
-        self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex, self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+
+        if self.surfaceDeplacementCheckBox.isChecked():
+            self.projectAllFiducials()
+
+        self.update();
+
+    def onSurfaceDeplacementStateChanged(self):
+        if self.surfaceDeplacementCheckBox.isChecked():
+            self.projectAllFiducials()
+            self.update()
+
+    def update(self):
+        # print "landmarks index " + str(self.landmark1ComboBox.currentIndex) + ", " + str(self.landmark2ComboBox.currentIndex) + ", " + str(self.landmark3ComboBox.currentIndex) + ", "
+        if self.landmark1ComboBox.currentIndex > 0 and self.landmark2ComboBox.currentIndex > 0 and self.landmark3ComboBox.currentIndex > 0:
+            self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex, self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+
+    def projectFiducialOnClosestSurface(self, fidlist, fidid, pointLocatorDictionary):
+
+        landmarkCoord = numpy.zeros(3)
+
+        fidlist.GetNthFiducialPosition(fidid, landmarkCoord)
+        minDistance = MAXINT
+        minClosestPoint = numpy.zeros(3)
+
+        #print "landmark: " + str(landmarkCoord) + ", fidid: " + str(fidid)
+        keys = pointLocatorDictionary.keys()
+        for i in range(0, len(keys)):
+            
+            locator = pointLocatorDictionary[keys[i]]
+            
+            closestpointid = locator.FindClosestPoint(landmarkCoord)
+            
+            mrmlmodelcollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", keys[i])
+            modelnode = mrmlmodelcollection.GetItemAsObject(0)
+            
+            closestpoint = modelnode.GetPolyData().GetPoints().GetPoint(closestpointid)
+            #print "closestpointid:" + str(closestpointid) + ", point: " + str(closestpoint)
+
+            distance = numpy.linalg.norm( closestpoint - landmarkCoord )
+
+            #print "distance: " + str(distance)
+
+            if distance < minDistance:
+                minDistance = distance
+                minClosestPoint = closestpoint
+        
+        if minClosestPoint[0] !=landmarkCoord[0] or minClosestPoint[1] != landmarkCoord[1] or minClosestPoint[2] != landmarkCoord[2]:
+            fidlist.RemoveObserver(self.setPointModifiedEventId)
+            fidlist.SetNthFiducialPosition(fidid, minClosestPoint[0], minClosestPoint[1], minClosestPoint[2])
+            self.setPointModifiedEventId = fidlist.AddObserver(fidlist.PointModifiedEvent, self.onPointModifiedEvent)
 
     def addLandMarkClicked(self):
-        print "Add landmarks"
+        #print "Add landmarks"
         # # Place landmarks in the 3D scene
         fidlist = self.logic.getFiducialList()
         slicer.mrmlScene.AddNode(fidlist)
@@ -698,13 +812,12 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
     def onFiducialAdded(self, obj, event):
         fidlist = obj
-
         label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
         
         self.landmark1ComboBox.addItem(label)
         self.landmark2ComboBox.addItem(label)
         self.landmark3ComboBox.addItem(label)
-    
+        
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def __init__(self, id = -1):
@@ -733,6 +846,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def remove(self):
         self.renderer.RemoveViewProp(self.actor)
         self.renderer.Render()
+
 
     def getFiducialList(self):
         
@@ -775,7 +889,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         A = numpy.matrix([[0], [0], [0], [1]])
         
         normalVector = matrix * n_vector
-        print "n : \n", normalVector
+        #print "n : \n", normalVector
         A = matrix * A
         
         
@@ -785,91 +899,93 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         normalVector1[0] = normalVector[0] - A[0]
         normalVector1[1] = normalVector[1] - A[1]
         normalVector1[2] = normalVector[2] - A[2]
-        print normalVector1
+        
+        #print normalVector1
         
         return normalVector1
     
     def getAngle(self, normalVect1, normalVect2):
         
         norm1 = sqrt(normalVect1[0]*normalVect1[0]+normalVect1[1]*normalVect1[1]+normalVect1[2]*normalVect1[2])
-        print "norme 1: \n", norm1
+        #print "norme 1: \n", norm1
         norm2 =sqrt(normalVect2[0]*normalVect2[0]+normalVect2[1]*normalVect2[1]+normalVect2[2]*normalVect2[2])
-        print "norme 2: \n", norm2
+        #print "norme 2: \n", norm2
         
         
         scalar_product = (normalVect1[0]*normalVect2[0]+normalVect1[1]*normalVect2[1]+normalVect1[2]*normalVect2[2])
-        print "scalar product : \n", scalar_product
+        #print "scalar product : \n", scalar_product
         
         angle = acos(scalar_product/(norm1*norm2))
-        print "radian angle : ", angle
+        
+        #print "radian angle : ", angle
         
         angle_degree = angle*180/pi
-        print "Angle in degree", angle_degree
+        #print "Angle in degree", angle_degree
         
         
         norm1_RL = sqrt(normalVect1[1]*normalVect1[1]+normalVect1[2]*normalVect1[2])
-        print "norme RL: \n", norm1_RL
+        #print "norme RL: \n", norm1_RL
         norm2_RL =sqrt(normalVect2[1]*normalVect2[1]+normalVect2[2]*normalVect2[2])
-        print "norme RL: \n", norm2_RL
+        #print "norme RL: \n", norm2_RL
         
         if (norm1_RL ==0 or norm1_RL ==0):
             self.angle_degre_RL = 0
             self.angle_degre_RL_comp = 0
         else:
             scalar_product_RL = (normalVect1[1]*normalVect2[1]+normalVect1[2]*normalVect2[2])
-            print "scalar product : \n", scalar_product_RL
+            #print "scalar product : \n", scalar_product_RL
             
             angleRL = acos(scalar_product_RL/(norm1_RL*norm2_RL))
-            print "radian angle : ", angleRL
+            #print "radian angle : ", angleRL
             
             self.angle_degre_RL = angleRL*180/pi
             self.angle_degre_RL = round(self.angle_degre_RL,2)
-            print self.angle_degre_RL
+            #print self.angle_degre_RL
             self.angle_degre_RL_comp = 180-self.angle_degre_RL
         
         
         norm1_SI = sqrt(normalVect1[0]*normalVect1[0]+normalVect1[1]*normalVect1[1])
-        print "norme1_SI : \n", norm1_SI
+        #print "norme1_SI : \n", norm1_SI
         norm2_SI =sqrt(normalVect2[0]*normalVect2[0]+normalVect2[1]*normalVect2[1])
-        print "norme2_SI : \n", norm2_SI
+        #print "norme2_SI : \n", norm2_SI
         
         if (norm1_SI ==0 or norm2_SI ==0):
             self.angle_degre_SI = 0
             self.angle_degre_SI_comp = 0
         else:
             scalar_product_SI = (normalVect1[0]*normalVect2[0]+normalVect1[1]*normalVect2[1])
-            print "scalar product_SI : \n", scalar_product_SI
+            #print "scalar product_SI : \n", scalar_product_SI
             
             angleSI = acos(scalar_product_SI/(norm1_SI*norm2_SI))
-            print "radian angle : ", angleSI
+            #print "radian angle : ", angleSI
             
             self.angle_degre_SI = angleSI*180/pi
             self.angle_degre_SI = round(self.angle_degre_SI,2)
-            print self.angle_degre_SI
+            #print self.angle_degre_SI
             self.angle_degre_SI_comp = 180-self.angle_degre_SI
-            print self.angle_degre_SI_comp
+            #print self.angle_degre_SI_comp
         
         norm1_AP = sqrt(normalVect1[0]*normalVect1[0]+normalVect1[2]*normalVect1[2])
-        print "norme1_SI : \n", norm1_AP
+        #print "norme1_SI : \n", norm1_AP
         norm2_AP =sqrt(normalVect2[0]*normalVect2[0]+normalVect2[2]*normalVect2[2])
-        print "norme2_SI : \n", norm2_AP
+        #print "norme2_SI : \n", norm2_AP
         
         if (norm1_AP ==0 or norm2_AP ==0):
             self.angle_degre_AP = 0
             self.angle_degre_AP_comp = 0
         else:
             scalar_product_AP = (normalVect1[0]*normalVect2[0]+normalVect1[2]*normalVect2[2])
-            print "scalar product_SI : \n", scalar_product_AP
+            #print "scalar product_SI : \n", scalar_product_AP
             
-            print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
+            #print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
             
             angleAP = acos(scalar_product_AP/(norm1_AP*norm2_AP))
             
-            print "radian angle : ", angleAP
+            #print "radian angle : ", angleAP
             
             self.angle_degre_AP = angleAP*180/pi
             self.angle_degre_AP = round(self.angle_degre_AP,2)
-            print self.angle_degre_AP
+            #print self.angle_degre_AP
             self.angle_degre_AP_comp = 180-self.angle_degre_AP
     
     def normalLandmarks(self, GA, GB):
@@ -878,13 +994,13 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         Vn[1] = GA[2]*GB[0] - GA[0]*GB[2]
         Vn[2] = GA[0]*GB[1] - GA[1]*GB[0]
         
-        print "Vn = ",Vn
+        #print "Vn = ",Vn
         
         norm_Vn = sqrt(Vn[0]*Vn[0]+Vn[1]*Vn[1]+Vn[2]*Vn[2])
         
         Normal = Vn/norm_Vn
         
-        print "N = ",Normal
+        #print "N = ",Normal
         
         return Normal
     
@@ -897,7 +1013,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         A = numpy.matrix([[0], [0], [0], [1]])
         
         normalVector = matrix * n_vector
-        print "n : \n", normalVector
+        #print "n : \n", normalVector
         A = matrix * A
         
         normalVector1 = normalVector
@@ -905,7 +1021,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         normalVector1[0] = normalVector[0] - A[0]
         normalVector1[1] = normalVector[1] - A[1]
         normalVector1[2] = normalVector[2] - A[2]
-        print normalVector1
+        #print normalVector1
         
         return normalVector1
     
@@ -970,7 +1086,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         
         G = centerOfMass.GetCenter()
         
-        print "Center of mass = ",G
+        #print "Center of mass = ",G
         
         A = (r1,a1,s1)
         B = (r2,a2,s2)
@@ -982,7 +1098,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GA[1] = A[1]-G[1]
         GA[2] = A[2]-G[2]
         
-        print "GA = ", GA
+        #print "GA = ", GA
         
         # Vector BG
         GB = numpy.matrix([[0],[0],[0]])
@@ -990,7 +1106,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GB[1] = B[1]-G[1]
         GB[2] = B[2]-G[2]
         
-        print "GB = ", GB
+        #print "GB = ", GB
         
         # Vector CG
         GC = numpy.matrix([[0],[0],[0]])
@@ -998,7 +1114,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GC[1] = C[1]-G[1]
         GC[2] = C[2]-G[2]
         
-        print "GC = ", GC
+        #print "GC = ", GC
         
         self.N = self.normalLandmarks(GA,GB)
         
@@ -1011,21 +1127,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         D[1] = slider*GA[1] + G[1]
         D[2] = slider*GA[2] + G[2]
         
-        print "Slider value : ", slider
+        #print "Slider value : ", slider
         
-        print "D = ",D
+        #print "D = ",D
         
         E[0] = slider*GB[0] + G[0]
         E[1] = slider*GB[1] + G[1]
         E[2] = slider*GB[2] + G[2]
         
-        print "E = ",E
+        #print "E = ",E
         
         F[0] = slider*GC[0] + G[0]
         F[1] = slider*GC[1] + G[1]
         F[2] = slider*GC[2] + G[2]
         
-        print "F = ",F
+        #print "F = ",F
 
         planeSource = self.planeSource
         planeSource.SetNormal(self.N[0],self.N[1],self.N[2])
