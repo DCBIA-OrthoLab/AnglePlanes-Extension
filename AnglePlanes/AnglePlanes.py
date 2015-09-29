@@ -88,7 +88,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         #self.midPointFiducialDictionaryID = {}
         # self.logic.initializePlane()
         self.ignoredNodeNames = ('Red Volume Slice', 'Yellow Volume Slice', 'Green Volume Slice')
-
+        self.colorSliceVolumes = dict()
         self.n_vector = numpy.matrix([[0], [0], [1], [1]])
 
         self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
@@ -129,7 +129,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.computeBox = qt.QPushButton("Compute Bounding Box around all models")
         buttonFrameBox.layout().addWidget(self.computeBox)
         self.computeBox.connect('clicked()', self.onComputeBox)
-
+        self.computeBox.setDisabled(True)
         self.CollapsibleButton = ctk.ctkCollapsibleButton()
         self.CollapsibleButton.text = "Manage planes"
         self.layout.addWidget(self.CollapsibleButton)
@@ -344,6 +344,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         numberOfVisibleModels = len(self.getPositionOfModelNodes(True))
         # if they are new models and if they are visible, allow to select "on surface" to place new fiducials
         if numberOfVisibleModels > 0:
+            self.computeBox.setDisabled(False)
             if self.currentMidPointExists():
                 key = self.getCurrentMidPointFiducialStructure()
                 self.midPointOnSurfaceCheckBox.setDisabled(False)
@@ -355,6 +356,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 x.surfaceDeplacementCheckBox.setDisabled(False)
         # else there are no visible models or if they are not visible, disable "on surface" to place new fiducials
         else:
+            self.computeBox.setDisabled(True)
             self.midPointOnSurfaceCheckBox.setDisabled(True)
             self.midPointOnSurfaceCheckBox.setChecked(False)
             for x in self.planeControlsDictionary.values():
@@ -378,8 +380,34 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             lm = slicer.app.layoutManager()
             self.currentLayout = lm.layout
             lm.setLayout(4)  # 3D-View
+        # Show manual planes
+        for planeControls in self.planeControlsDictionary.values():
+            if planeControls.PlaneIsDefined():
+                planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
+                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, planeControls.slideOpacity.value)
+        self.valueComboBox()
+        self.onComputeBox()
 
     def exit(self):
+        # Remove hidden nodes that are created just for Angle Planes
+        for x in self.colorSliceVolumes.values():
+            node = slicer.mrmlScene.GetNodeByID(x)
+            slicer.mrmlScene.RemoveNode(node)
+            node.SetHideFromEditors(False)
+        self.colorSliceVolumes = dict()
+        # Hide manual planes
+        for planeControls in self.planeControlsDictionary.values():
+            if planeControls.PlaneIsDefined():
+                planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
+                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, 0)
+        # Hide planes
+        for x in self.logic.ColorNodeCorrespondence.keys():
+            compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
+            compNode.SetLinkedControl(False)
+            slice = slicer.mrmlScene.GetNodeByID(self.logic.ColorNodeCorrespondence[x])
+            slice.SetWidgetVisible(False)
+            slice.SetSliceVisible(False)
+        # Reset layout
         if self.autoChangeLayout.isChecked():
             lm = slicer.app.layoutManager()
             if lm.layout == 4:  # the user has not manually changed the layout
@@ -476,47 +504,13 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             origin.append(bound[x * 2] + dim[x] / 2)
             dim[x] *= 1.1
 
-        def CreateNewNode(colorName, color, dim, origin):
-            # we add a pseudo-random number to the name of our empty volume to avoid the risk of having a volume called
-            #  exactly the same by the user which could be confusing. We could also have used slicer.app.sessionId()
-            VolumeName = "AnglePlanes_EmptyVolume_" + str(slicer.app.applicationPid()) + "_" + colorName
-            sampleVolumeNode = slicer.util.getNode(VolumeName)
-            if sampleVolumeNode == None:
-                # Do NOT set the spacing and the origin of imageData (vtkImageData)
-                # The spacing and the origin should only be set in the vtkMRMLScalarVolumeNode!!!!!!
-                # We only create an image of 1 voxel (as we only use it to color the planes
-                imageData = vtk.vtkImageData()
-                imageData.SetDimensions(1, 1, 1)
-                imageData.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
-                imageData.SetScalarComponentFromDouble(0, 0, 0, 0, color)
-                if hasattr(slicer, 'vtkMRMLLabelMapVolumeNode'):
-                    sampleVolumeNode = slicer.vtkMRMLLabelMapVolumeNode()
-                else:
-                    sampleVolumeNode = slicer.vtkMRMLScalarVolumeNode()
-                sampleVolumeNode = slicer.mrmlScene.AddNode(sampleVolumeNode)
-                sampleVolumeNode.SetName(VolumeName)
-                labelmapVolumeDisplayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
-                slicer.mrmlScene.AddNode(labelmapVolumeDisplayNode)
-                colorNode = slicer.util.getNode('GenericAnatomyColors')
-                labelmapVolumeDisplayNode.SetAndObserveColorNodeID(colorNode.GetID())
-                sampleVolumeNode.SetAndObserveImageData(imageData)
-                sampleVolumeNode.SetAndObserveDisplayNodeID(labelmapVolumeDisplayNode.GetID())
-                labelmapVolumeDisplayNode.VisibilityOn()
-                print "first"
-            sampleVolumeNode.SetOrigin(origin[0], origin[1], origin[2])
-            sampleVolumeNode.SetSpacing(dim[0], dim[1], dim[2])
-            if not hasattr(slicer, 'vtkMRMLLabelMapVolumeNode'):
-                sampleVolumeNode.SetLabelMap(1)
-            sampleVolumeNode.SetHideFromEditors(True)
-            sampleVolumeNode.SetSaveWithScene(False)
-            return sampleVolumeNode
-
         dictColors = {'Red': 32, 'Yellow': 15, 'Green': 1}
         for x in dictColors.keys():
-            sampleVolumeNode = CreateNewNode(x, dictColors[x], dim, origin)
+            sampleVolumeNode = self.CreateNewNode(x, dictColors[x], dim, origin)
             compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
             compNode.SetLinkedControl(False)
             compNode.SetBackgroundVolumeID(sampleVolumeNode.GetID())
+            print "set background" + x
         lm = slicer.app.layoutManager()
         #Reset and fit 2D-views
         lm.resetSliceViews()
@@ -531,6 +525,43 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             threeDView.resetFocalPoint()
             #Reset camera in 3D view to center the models and position the camera so that all actors can be seen
             threeDView.renderWindow().GetRenderers().GetFirstRenderer().ResetCamera()
+
+    def CreateNewNode(self, colorName, color, dim, origin):
+        # we add a pseudo-random number to the name of our empty volume to avoid the risk of having a volume called
+        #  exactly the same by the user which could be confusing. We could also have used slicer.app.sessionId()
+        if colorName not in self.colorSliceVolumes.keys():
+            VolumeName = "AnglePlanes_EmptyVolume_" + str(slicer.app.applicationPid()) + "_" + colorName
+            # Do NOT set the spacing and the origin of imageData (vtkImageData)
+            # The spacing and the origin should only be set in the vtkMRMLScalarVolumeNode!!!!!!
+            # We only create an image of 1 voxel (as we only use it to color the planes
+            imageData = vtk.vtkImageData()
+            imageData.SetDimensions(1, 1, 1)
+            imageData.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+            imageData.SetScalarComponentFromDouble(0, 0, 0, 0, color)
+            if hasattr(slicer, 'vtkMRMLLabelMapVolumeNode'):
+                sampleVolumeNode = slicer.vtkMRMLLabelMapVolumeNode()
+            else:
+                sampleVolumeNode = slicer.vtkMRMLScalarVolumeNode()
+            sampleVolumeNode = slicer.mrmlScene.AddNode(sampleVolumeNode)
+            sampleVolumeNode.SetName(VolumeName)
+            labelmapVolumeDisplayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
+            slicer.mrmlScene.AddNode(labelmapVolumeDisplayNode)
+            colorNode = slicer.util.getNode('GenericAnatomyColors')
+            labelmapVolumeDisplayNode.SetAndObserveColorNodeID(colorNode.GetID())
+            sampleVolumeNode.SetAndObserveImageData(imageData)
+            sampleVolumeNode.SetAndObserveDisplayNodeID(labelmapVolumeDisplayNode.GetID())
+            labelmapVolumeDisplayNode.VisibilityOn()
+            self.colorSliceVolumes[colorName] = sampleVolumeNode.GetID()
+        sampleVolumeNode = slicer.mrmlScene.GetNodeByID(self.colorSliceVolumes[colorName])
+        sampleVolumeNode.SetOrigin(origin[0], origin[1], origin[2])
+        sampleVolumeNode.SetSpacing(dim[0], dim[1], dim[2])
+        if not hasattr(slicer, 'vtkMRMLLabelMapVolumeNode'):
+            sampleVolumeNode.SetLabelMap(1)
+        sampleVolumeNode.SetHideFromEditors(True)
+        sampleVolumeNode.SetSaveWithScene(False)
+        return sampleVolumeNode
+
+
 
     def selectedMiddlePointPlane(self):
         if self.selectPlaneForMidPoint.currentText not in self.planeControlsDictionary.keys():
@@ -643,9 +674,11 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def onCloseScene(self, obj, event):
         self.middleFiducialDictionary = dict()
+        self.colorSliceVolumes = dict()
         keys = self.planeControlsDictionary.keys()
         for x in keys[len('Plane '):]:
             self.RemoveManualPlane(x)
+        self.planeControlsDictionary = dict()
             # globals()[self.moduleName] = slicer.util.reloadScriptedModule(self.moduleName)
 
     def angleValue(self):
