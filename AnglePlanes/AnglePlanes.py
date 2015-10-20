@@ -506,8 +506,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             dim.append(bound[x * 2 + 1] - bound[x * 2])
             origin.append(bound[x * 2] + dim[x] / 2)
             dim[x] *= 1.1
-        print dim
-        print origin
 
         dictColors = {'Red': 32, 'Yellow': 15, 'Green': 1}
         for x in dictColors.keys():
