@@ -1192,10 +1192,8 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     try:
         slicer.sys
-        print "a"
     except:
         import sys
-        print "b"
 
     def __init__(self, id=-1):
         self.ColorNodeCorrespondence = {'Red': 'vtkMRMLSliceNodeRed',
