@@ -6,9 +6,7 @@ from math import *
 
 from slicer.ScriptedLoadableModule import *
 
-import os
 import pickle
-import time
 
 from slicer.util import VTKObservationMixin
 
@@ -53,6 +51,7 @@ class AnglePlanesMiddleFiducial():
 
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
+
         ScriptedLoadableModule.__init__(self, parent)
         parent.title = "Angle Planes"
         parent.categories = ["Shape Analysis"]
@@ -80,6 +79,7 @@ class AnglePlanes(ScriptedLoadableModule):
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
+
         self.moduleName = "AnglePlanes"
         self.i = 0
         self.logic = AnglePlanesLogic()
@@ -480,7 +480,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         positionOfVisibleNodes = self.getPositionOfModelNodes(True)
         if len(positionOfVisibleNodes) == 0:
             return
-        maxValue = slicer.sys.float_info.max
+        try:
+            maxValue = slicer.sys.float_info.max
+        except:
+            maxValue = self.logic.sys.float_info.max
         bound = [maxValue, -maxValue, maxValue, -maxValue, maxValue, -maxValue]
         for i in positionOfVisibleNodes:
             node = slicer.mrmlScene.GetNthNodeByClass(i, "vtkMRMLModelNode")
@@ -503,6 +506,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             dim.append(bound[x * 2 + 1] - bound[x * 2])
             origin.append(bound[x * 2] + dim[x] / 2)
             dim[x] *= 1.1
+        print dim
+        print origin
 
         dictColors = {'Red': 32, 'Yellow': 15, 'Green': 1}
         for x in dictColors.keys():
@@ -1185,6 +1190,13 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
+    try:
+        slicer.sys
+        print "a"
+    except:
+        import sys
+        print "b"
+
     def __init__(self, id=-1):
         self.ColorNodeCorrespondence = {'Red': 'vtkMRMLSliceNodeRed',
                                         'Yellow': 'vtkMRMLSliceNodeYellow',
