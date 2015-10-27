@@ -508,7 +508,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             origin.append(bound[x * 2] + dim[x] / 2)
             dim[x] *= 1.1
 
-        # ---------definition of planes for cliping around the bounding box ---------#
+        # ---------definition of planes for clipping around the bounding box ---------#
 
         self.planeCollection = vtk.vtkPlaneCollection()
         self.planeXmin = vtk.vtkPlane()
@@ -1216,7 +1216,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
-
     try:
         slicer.sys
     except:
@@ -1465,8 +1464,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             points.SetPoint(1, r2, a2, s2)
             points.SetPoint(2, r3, a3, s3)
 
-        # print "points: ", points.GetPoint(0),"///", points.GetPoint(1),"///", points.GetPoint(2)
-
         polydata = self.polydata
         polydata.SetPoints(points)
 
@@ -1489,7 +1486,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GA[1] = A[1] - G[1]
         GA[2] = A[2] - G[2]
 
-        # print "GA = ", GA
+        #print "GA = ", GA
 
         # Vector BG
         GB = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1497,7 +1494,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GB[1] = B[1] - G[1]
         GB[2] = B[2] - G[2]
 
-        # print "GB = ", GB
+        #print "GB = ", GB
 
         # Vector CG
         GC = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1505,7 +1502,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GC[1] = C[1] - G[1]
         GC[2] = C[2] - G[2]
 
-        # print "GC = ", GC
+        #print "GC = ", GC
 
         self.N = self.normalLandmarks(GA, GB)
 
@@ -1517,21 +1514,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         D[1] = slider * GA[1] + G[1]
         D[2] = slider * GA[2] + G[2]
 
-        # print "Slider value : ", slider
+        #print "Slider value : ", slider
 
-        # print "D = ",D
+        #print "D = ",D
 
         E[0] = slider * GB[0] + G[0]
         E[1] = slider * GB[1] + G[1]
         E[2] = slider * GB[2] + G[2]
 
-        # print "E = ",E
+        #print "E = ",E
 
         F[0] = slider * GC[0] + G[0]
         F[1] = slider * GC[1] + G[1]
         F[2] = slider * GC[2] + G[2]
 
-        # print "F = ",F
+        #print "F = ",F
 
         planeSource = self.planeSource
         planeSource.SetNormal(self.N[0], self.N[1], self.N[2])
