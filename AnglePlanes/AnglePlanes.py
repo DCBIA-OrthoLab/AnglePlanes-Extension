@@ -977,14 +977,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
         self.layout().addRow(landmarkLayout)
 
-        self.slider = ctk.ctkSliderWidget()
-        slider = self.slider
-        slider.singleStep = 0.1
-        slider.minimum = 0.1
-        slider.maximum = 10
-        slider.value = 1.0
-        slider.toolTip = "Set the size of your plane."
-
         self.slideOpacity = ctk.ctkSliderWidget()
         slideOpacity = self.slideOpacity
         slideOpacity.singleStep = 0.1
@@ -993,18 +985,20 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         slideOpacity.value = 1.0
         slideOpacity.toolTip = "Set the opacity of your plane."
 
-        slider.connect('valueChanged(double)', self.placePlaneClicked)
         slideOpacity.connect('valueChanged(double)', self.placePlaneClicked)
 
         landmarkSliderLayout = qt.QHBoxLayout()
 
-        label = qt.QLabel(' Size:')
         label2 = qt.QLabel(' Opacity:')
 
-        landmarkSliderLayout.addWidget(label)
-        landmarkSliderLayout.addWidget(self.slider)
         landmarkSliderLayout.addWidget(label2)
         landmarkSliderLayout.addWidget(self.slideOpacity)
+
+        self.AdaptToBoundingBoxCheckBox = qt.QCheckBox("Adapt to bounding box")
+        self.AdaptToBoundingBoxCheckBox.setChecked(False)
+        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.onHideSurface)
+        landmarkSliderLayout.addWidget(self.AdaptToBoundingBoxCheckBox)
+        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)',self.placePlaneClicked)
 
         self.HidePlaneCheckBox = qt.QCheckBox("Hide")
         self.HidePlaneCheckBox.setChecked(False)
@@ -1141,10 +1135,10 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         if self.PlaneIsDefined():
             if self.HidePlaneCheckBox.isChecked():
                 self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                          self.landmark3ComboBox.currentIndex, self.slider.value, 0, self.planeCollection)
+                                          self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox, 0, self.planeCollection)
             else:
                 self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                          self.landmark3ComboBox.currentIndex, self.slider.value,
+                                          self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox,
                                           self.slideOpacity.value, self.planeCollection)
 
     def update(self):
@@ -1152,7 +1146,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.planeCollection = self.anglePlanes.planeCollection
         if self.PlaneIsDefined():
             self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                      self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value, self.planeCollection)
+                                      self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox, self.slideOpacity.value, self.planeCollection)
 
     def projectFiducialOnClosestSurface(self, fidlist, fidid, pointLocatorDictionary):
 
@@ -1417,10 +1411,15 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         return Normal
 
-    def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity, planeCollection):
+    def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         fidNode = self.getFiducialList()
+
+        if AdaptToBoundingBoxCheckBox.isChecked():
+            slider = 10000
+        else:
+            slider = 1
 
         r1 = 0
         a1 = 0
@@ -1543,12 +1542,14 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         planeSource.Update()
 
-        clipper = vtk.vtkClipClosedSurface()
-        print planeCollection
-        clipper.SetClippingPlanes(planeCollection)
-        clipper.SetInputData(planeSource.GetOutput())
-        clipper.Update()
-        plane = clipper.GetOutput()
+        if AdaptToBoundingBoxCheckBox.isChecked():
+            clipper = vtk.vtkClipClosedSurface()
+            clipper.SetClippingPlanes(planeCollection)
+            clipper.SetInputData(planeSource.GetOutput())
+            clipper.Update()
+            plane = clipper.GetOutput()
+        else:
+            plane = planeSource.GetOutput()
 
         mapper = self.mapper
         mapper.SetInputData(plane)
