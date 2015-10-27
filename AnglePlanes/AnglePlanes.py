@@ -85,6 +85,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.logic = AnglePlanesLogic()
         self.planeControlsId = 0
         self.planeControlsDictionary = {}
+        self.planeCollection = vtk.vtkPlaneCollection()
         #self.midPointFiducialDictionaryID = {}
         # self.logic.initializePlane()
         self.ignoredNodeNames = ('Red Volume Slice', 'Yellow Volume Slice', 'Green Volume Slice')
@@ -384,7 +385,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
                 planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
-                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, planeControls.slideOpacity.value)
+                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, planeControls.slideOpacity.value, self.planeCollection)
         self.valueComboBox()
         self.onComputeBox()
 
@@ -399,7 +400,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
                 planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
-                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, 0)
+                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, 0, self.planeCollection)
         # Hide planes
         for x in self.logic.ColorNodeCorrespondence.keys():
             compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
@@ -436,7 +437,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.planeControlsId += 1
         if len(self.planeControlsDictionary) >= 1:
             self.addPlaneButton.setDisabled(True)
-        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId, self.pointLocatorDictionary)
+        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId, self.pointLocatorDictionary, self.planeCollection)
         self.managePlanesFormLayout.addRow(planeControls)
 
         key = "Plane " + str(self.planeControlsId)
@@ -506,6 +507,35 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             dim.append(bound[x * 2 + 1] - bound[x * 2])
             origin.append(bound[x * 2] + dim[x] / 2)
             dim[x] *= 1.1
+
+        # ---------definition of planes for cliping around the bounding box ---------#
+
+        self.planeCollection = vtk.vtkPlaneCollection()
+        self.planeXmin = vtk.vtkPlane()
+        self.planeXmin.SetOrigin(bound[0],bound[2],bound[4])
+        self.planeXmin.SetNormal(1,0,0)
+        self.planeCollection.AddItem(self.planeXmin)
+        self.planeYmin = vtk.vtkPlane()
+        self.planeYmin.SetOrigin(bound[0],bound[2],bound[4])
+        self.planeYmin.SetNormal(0,1,0)
+        self.planeCollection.AddItem(self.planeYmin)
+        self.planeZmin = vtk.vtkPlane()
+        self.planeZmin.SetOrigin(bound[0],bound[2],bound[4])
+        self.planeZmin.SetNormal(0,0,1)
+        self.planeCollection.AddItem(self.planeZmin)
+        self.planeXmax = vtk.vtkPlane()
+        self.planeXmax.SetOrigin(bound[1],bound[3],bound[5])
+        self.planeXmax.SetNormal(-1,0,0)
+        self.planeCollection.AddItem(self.planeXmax)
+        self.planeYmax = vtk.vtkPlane()
+        self.planeYmax.SetOrigin(bound[1],bound[3],bound[5])
+        self.planeYmax.SetNormal(0,-1,0)
+        self.planeCollection.AddItem(self.planeYmax)
+        self.planeZmax = vtk.vtkPlane()
+        self.planeZmax.SetOrigin(bound[1],bound[3],bound[5])
+        self.planeZmax.SetNormal(0,0,-1)
+        self.planeCollection.AddItem(self.planeZmax)
+        print self.planeCollection
 
         dictColors = {'Red': 32, 'Yellow': 15, 'Green': 1}
         for x in dictColors.keys():
@@ -848,7 +878,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 # Each plane contains a separate fiducial list. The planes are named P1, P2, ..., PN. The landmarks are named
 # P1-1, P1-2, P1-N. 
 class AnglePlanesWidgetPlaneControl(qt.QFrame):
-    def __init__(self, anglePlanes, id, pointlocatordictionary):
+    def __init__(self, anglePlanes, id, pointlocatordictionary, planeCollection):
+
+        self.planeCollection = planeCollection
+
         qt.QFrame.__init__(self)
         self.id = id
 
@@ -1108,17 +1141,17 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         if self.PlaneIsDefined():
             if self.HidePlaneCheckBox.isChecked():
                 self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                          self.landmark3ComboBox.currentIndex, self.slider.value, 0)
+                                          self.landmark3ComboBox.currentIndex, self.slider.value, 0, self.planeCollection)
             else:
                 self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
                                           self.landmark3ComboBox.currentIndex, self.slider.value,
-                                          self.slideOpacity.value)
+                                          self.slideOpacity.value, self.planeCollection)
 
     def update(self):
         self.UpdateMiddlePointsPositions()
         if self.PlaneIsDefined():
             self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                      self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value)
+                                      self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value, self.planeCollection)
 
     def projectFiducialOnClosestSurface(self, fidlist, fidid, pointLocatorDictionary):
 
@@ -1188,6 +1221,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
+
     try:
         slicer.sys
     except:
@@ -1382,7 +1416,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         return Normal
 
-    def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity):
+    def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, slider, sliderOpacity, planeCollection):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         fidNode = self.getFiducialList()
@@ -1508,11 +1542,17 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         planeSource.Update()
 
-        plane = planeSource.GetOutput()
+        clipper = vtk.vtkClipClosedSurface()
+        print planeCollection
+        clipper.SetClippingPlanes(planeCollection)
+        clipper.SetInputData(planeSource.GetOutput())
+        clipper.Update()
+        plane = clipper.GetOutput()
 
         mapper = self.mapper
         mapper.SetInputData(plane)
         mapper.Update()
+
 
         self.actor.SetMapper(mapper)
         self.actor.GetProperty().SetColor(0, 0.4, 0.8)
