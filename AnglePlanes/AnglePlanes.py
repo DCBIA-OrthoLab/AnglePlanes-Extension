@@ -1149,6 +1149,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
     def update(self):
         self.UpdateMiddlePointsPositions()
+        self.planeCollection = self.anglePlanes.planeCollection
         if self.PlaneIsDefined():
             self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
                                       self.landmark3ComboBox.currentIndex, self.slider.value, self.slideOpacity.value, self.planeCollection)
