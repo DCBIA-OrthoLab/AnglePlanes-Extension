@@ -32,7 +32,6 @@ class ModelAddedClass(VTKObservationMixin):
         if isinstance(callData, slicer.vtkMRMLModelNode):
             self.removeObserver(callData, callData.PolyDataModifiedEvent, self.onModelNodePolyDataModified)
             callData.RemoveObservers(callData.DisplayModifiedEvent)
-            self.anglePlanes.removeModelPointLocator(callData.GetName())
             self.anglePlanes.updateOnSurfaceCheckBoxes()
         if isinstance(callData, slicer.vtkMRMLMarkupsFiducialNode):
             name = callData.GetName()
@@ -42,7 +41,7 @@ class ModelAddedClass(VTKObservationMixin):
                 self.anglePlanes.RemoveManualPlane(planeid)
 
     def onModelNodePolyDataModified(self, caller, eventId):
-        self.anglePlanes.addModelPointLocator(caller.GetName(), caller.GetPolyData())
+        pass
 
 class AnglePlanesMiddleFiducial():
     def __init__(self, P1, P2, onSurface, nodeID):
@@ -191,7 +190,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # Add plan Button
         self.addPlaneButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
         self.addPlaneButton.connect('clicked()', self.addNewPlane)
-        self.addPlaneButton.setEnabled(True)
+        self.addPlaneButton.setEnabled(False)
         # input GroupBox
         InputLayout = qt.QVBoxLayout()
         InputLayout.addLayout(InputModelLayout)
@@ -205,7 +204,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.landmarkComboBox.connect('currentIndexChanged(QString)', self.UpdateInterface)
         BoxLayout = qt.QFormLayout()
         BoxLayout.addRow("Select a Landmark:", self.landmarkComboBox)
-        self.surfaceDeplacementCheckBox = qt.QCheckBox("Is deplacement on the surface")
+        self.surfaceDeplacementCheckBox = qt.QCheckBox(" deplacement on surface ")
         self.surfaceDeplacementCheckBox.setChecked(True)
         self.surfaceDeplacementCheckBox.connect('stateChanged(int)', self.onSurfaceDeplacementStateChanged)
         scaleAndAddLandmarkLayout = qt.QHBoxLayout()
@@ -345,11 +344,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
 
-        self.pointLocatorDictionary = {}
-
         for i in self.getPositionOfModelNodes(False):
             modelnode = slicer.mrmlScene.GetNthNodeByClass(i, "vtkMRMLModelNode")
-            self.addModelPointLocator(modelnode.GetName(), modelnode.GetPolyData())
             modelnode.AddObserver(modelnode.DisplayModifiedEvent, self.onChangeModelDisplay)
         self.middleFiducialDictionary = dict()
         ModelAddedClass(self)
@@ -369,6 +365,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.logic.selectedModel = self.inputModelSelector.currentNode()
         self.logic.ModelChanged(self.inputModelSelector, self.inputLandmarksSelector)
         self.inputLandmarksSelector.setCurrentNode(None)
+        self.addPlaneButton.setEnabled(False)
 
     def onLandmarksChanged(self):
         print "-------Landmarks Changed--------"
@@ -381,7 +378,9 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 self.logic.connectLandmarks(self.inputModelSelector,
                                       self.inputLandmarksSelector,
                                       onSurface)
+                self.addPlaneButton.setEnabled(True)
             else:
+                self.addPlaneButton.setEnabled(False)
                 self.landmarkComboBox.clear()
 
     def onSurfaceDeplacementStateChanged(self):
@@ -449,9 +448,11 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def fillColorsComboBox(self, planeComboBox):
         planeComboBox.clear()
+        planeComboBox.addItem("None")
         planeComboBox.addItem("Red")
         planeComboBox.addItem("Yellow")
         planeComboBox.addItem("Green")
+        print self.planeControlsDictionary
         try:
             for x in self.planeControlsDictionary.keys():
                 if self.planeControlsDictionary[x].PlaneIsDefined():
@@ -471,16 +472,11 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             else:
                 self.midPointOnSurfaceCheckBox.setChecked(False)
                 self.midPointOnSurfaceCheckBox.setDisabled(True)
-            for x in self.planeControlsDictionary.values():
-                x.surfaceDeplacementCheckBox.setDisabled(False)
         # else there are no visible models or if they are not visible, disable "on surface" to place new fiducials
         else:
             self.computeBox.setDisabled(True)
             self.midPointOnSurfaceCheckBox.setDisabled(True)
             self.midPointOnSurfaceCheckBox.setChecked(False)
-            for x in self.planeControlsDictionary.values():
-                x.surfaceDeplacementCheckBox.setChecked(False)
-                x.surfaceDeplacementCheckBox.setDisabled(True)
 
     def getPositionOfModelNodes(self, onlyVisible):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
@@ -502,8 +498,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # Show manual planes
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
-                planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
-                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, planeControls.slideOpacity.value, self.planeCollection)
+                planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
+                                          planeControls.landmark3ComboBox.currentText, planeControls.slider.value, planeControls.slideOpacity.value, self.planeCollection)
         self.valueComboBox()
         self.onComputeBox()
 
@@ -517,8 +513,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # Hide manual planes
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
-                planeControls.logic.planeLandmarks(planeControls.landmark1ComboBox.currentIndex, planeControls.landmark2ComboBox.currentIndex,
-                                          planeControls.landmark3ComboBox.currentIndex, planeControls.slider.value, 0, self.planeCollection)
+                planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
+                                          planeControls.landmark3ComboBox.currentText, planeControls.slider.value, 0, self.planeCollection)
         # Hide planes
         for x in self.logic.ColorNodeCorrespondence.keys():
             compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
@@ -532,34 +528,24 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             if lm.layout == 4:  # the user has not manually changed the layout
                 lm.setLayout(self.currentLayout)
 
-    def removeModelPointLocator(self, name):
-        if name in self.pointLocatorDictionary:
-            print("Removing point locator {0}".format(name))
-            del self.pointLocatorDictionary[name]
-
-    def addModelPointLocator(self, name, polydata):
-
-        if name not in self.pointLocatorDictionary and name not in self.ignoredNodeNames:
-            print "Adding point locator: {0}".format(name)
-            pointLocator = vtk.vtkPointLocator()
-            pointLocator.SetDataSet(polydata)
-            pointLocator.AutomaticOn()
-            pointLocator.BuildLocator()
-
-            self.pointLocatorDictionary[name] = pointLocator
-
     def addNewPlane(self, keyLoad=-1):
+        print "------- New plane created -------"
         if keyLoad != -1:
             self.planeControlsId = keyLoad
         else:
             self.planeControlsId += 1
         if len(self.planeControlsDictionary) >= 1:
             self.addPlaneButton.setDisabled(True)
-        planeControls = AnglePlanesWidgetPlaneControl(self, self.planeControlsId, self.pointLocatorDictionary, self.planeCollection)
+        planeControls = AnglePlanesWidgetPlaneControl(self,
+                                                      self.planeControlsId,
+                                                      self.planeCollection,
+                                                      self.inputLandmarksSelector.currentNode())
         self.managePlanesFormLayout.addRow(planeControls)
 
         key = "Plane " + str(self.planeControlsId)
+        print self.planeControlsDictionary
         self.planeControlsDictionary[key] = planeControls
+        print self.planeControlsDictionary
         self.updatePlanesComboBoxes()
         self.midPointGroupBox.setDisabled(False)
         self.selectPlaneForMidPoint.addItem(key)
@@ -585,12 +571,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         if self.selectPlaneForMidPoint.findText(key) > -1:
             self.selectPlaneForMidPoint.removeItem(self.selectPlaneForMidPoint.findText(key))
         if fiducialList:
-            # fiducialList.SetDisplayVisibility(False)
-            fiducialList.RemoveObserver(fiducialList.onFiducialAddedObserverTag)
-            fiducialList.RemoveObserver(fiducialList.onFiducialRemovedObserverTag)
-            fiducialList.RemoveObserver(fiducialList.setPointModifiedEventObserverTag)
-            fiducialList.RemoveObserver(fiducialList.onFiducialAddedMidPointObserverTag)
-            fiducialList.RemoveObserver(fiducialList.onFiducialRemovedMidPointObserverTag)
             if planeControls.removeFiducials.checkState() == qt.Qt.Checked:
                 slicer.app.mrmlScene().RemoveNode(fiducialList)
 
@@ -649,14 +629,14 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeZmax.SetOrigin(bound[1],bound[3],bound[5])
         self.planeZmax.SetNormal(0,0,-1)
         self.planeCollection.AddItem(self.planeZmax)
-        print self.planeCollection
+        # print self.planeCollection
         dictColors = {'Red': 32, 'Yellow': 15, 'Green': 1}
         for x in dictColors.keys():
             sampleVolumeNode = self.CreateNewNode(x, dictColors[x], dim, origin)
             compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
             compNode.SetLinkedControl(False)
             compNode.SetBackgroundVolumeID(sampleVolumeNode.GetID())
-            print "set background" + x
+            # print "set background" + x
         lm = slicer.app.layoutManager()
         #Reset and fit 2D-views
         lm.resetSliceViews()
@@ -844,8 +824,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         else:
             comboBox.setCurrentIndex(comboBox.findText(oldString))
 
-
     def updatePlanesComboBoxes(self):
+        print "---- update plane combobox ----"
         self.planeComboBox1.blockSignals(True)
         self.planeComboBox2.blockSignals(True)
         colorPlane1 = self.planeComboBox1.currentText
@@ -877,8 +857,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.defineAngle(self.planeComboBox1.currentText, self.planeComboBox2.currentText)
 
     def defineAngle(self, colorPlane1, colorPlane2):
-        print "DEFINE ANGLE"
-        print colorPlane1
+        # print colorPlane1
         if colorPlane1 in self.logic.ColorNodeCorrespondence:
             slice1 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane1])
             self.logic.getMatrix(slice1)
@@ -888,7 +867,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             normal1 = self.logic.defineNormal(matrix1)
         else:
             normal1 = self.planeControlsDictionary[colorPlane1].logic.N
-        print colorPlane2
+        # print colorPlane2
         if colorPlane2 in self.logic.ColorNodeCorrespondence:
             slice2 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane2])
             self.logic.getMatrix(slice2)
@@ -965,13 +944,16 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 # Each plane contains a separate fiducial list. The planes are named P1, P2, ..., PN. The landmarks are named
 # P1-1, P1-2, P1-N. 
 class AnglePlanesWidgetPlaneControl(qt.QFrame):
-    def __init__(self, anglePlanes, id, pointlocatordictionary, planeCollection):
+    def __init__(self, anglePlanes, id, planeCollection, fidlist):
+        # variables
+        self.anglePlanes = anglePlanes
+        self.logic = AnglePlanesLogic(id, anglePlanes)
         self.planeCollection = planeCollection
         qt.QFrame.__init__(self)
         self.id = id
+        self.fidlist = fidlist
+        #interface
         self.setLayout(qt.QFormLayout())
-        self.pointLocatorDictionary = pointlocatordictionary
-        self.logic = AnglePlanesLogic(id)
         landmarkLayout = qt.QVBoxLayout()
         planeLabelLayout = qt.QHBoxLayout()
         planeLabel = qt.QLabel('Plane ' + str(id) + ":")
@@ -985,13 +967,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         planeLabelLayout.addWidget(addFiducialLabel)
         planeLabelLayout.addWidget(addFiducialButton)
         numberOfNodes = len(anglePlanes.getPositionOfModelNodes(True))
-        self.surfaceDeplacementCheckBox = qt.QCheckBox("On Surface")
-        if numberOfNodes > 0:
-            self.surfaceDeplacementCheckBox.setChecked(True)
-        else:
-            self.surfaceDeplacementCheckBox.setDisabled(True)
-        self.surfaceDeplacementCheckBox.connect('stateChanged(int)', self.onSurfaceDeplacementStateChanged)
-        planeLabelLayout.addWidget(self.surfaceDeplacementCheckBox)
         landmarkLayout.addLayout(planeLabelLayout)
         label1Layout = qt.QHBoxLayout()
         label1 = qt.QLabel(' L1:')
@@ -1020,33 +995,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         label3Layout.addWidget(label3)
         label3Layout.addWidget(landmark3ComboBox)
         landmarkLayout.addLayout(label3Layout)
-
-        # fiducial list for the plane
-
-        fidNode = self.logic.getFiducialList()
-        for i in range(0, fidNode.GetNumberOfFiducials()):
-            label = fidNode.GetNthFiducialLabel(i)
-            landmark1ComboBox.addItem(label)
-            landmark2ComboBox.addItem(label)
-            landmark3ComboBox.addItem(label)
-
-            anglePlanes.landmarkComboBox1MidPoint.addItem(label)
-            anglePlanes.landmarkComboBox2MidPoint.addItem(label)
-            #anglePlanes.midPointFiducialDictionaryID[label] = fidNode.GetNthMarkupID(i)
-
-
-        # fidNode.onFiducialAddedObserverTag = fidNode.AddObserver(fidNode.MarkupAddedEvent, self.onFiducialAdded)
-        # fidNode.onFiducialRemovedObserverTag = fidNode.AddObserver(fidNode.MarkupRemovedEvent, self.onFiducialRemoved)
-        #
-        # fidNode.setPointModifiedEventObserverTag = fidNode.AddObserver(fidNode.PointModifiedEvent,
-        #                                                                self.onPointModifiedEvent)
-        #
-        # # These observers are in AnglePlaneWidgets, they listen to any fiducial being added
-        #
-        # fidNode.onFiducialAddedMidPointObserverTag = fidNode.AddObserver(fidNode.MarkupAddedEvent,
-        #                                                                  anglePlanes.onFiducialChangedMidPoint)
-        # fidNode.onFiducialRemovedMidPointObserverTag = fidNode.AddObserver(fidNode.MarkupRemovedEvent,
-        #                                                                    anglePlanes.onFiducialChangedMidPoint)
 
         self.layout().addRow(landmarkLayout)
 
@@ -1090,72 +1038,39 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.layout().addRow(removeButtonLayout)
         removePlaneButton.connect('clicked(bool)', self.onRemove)
 
-        self.anglePlanes = anglePlanes
+        # fiducial list for the plane
+        self.logic.updateLandmarkComboBox(self.fidlist, self.landmark1ComboBox)
+        self.logic.updateLandmarkComboBox(self.fidlist, self.landmark2ComboBox)
+        self.logic.updateLandmarkComboBox(self.fidlist, self.landmark3ComboBox)
 
 
     def PlaneIsDefined(self):
-        if self.landmark1ComboBox.currentIndex > 0 and self.landmark2ComboBox.currentIndex > 0 and self.landmark3ComboBox.currentIndex > 0:
-            return True
-        else:
-            return False
+        landmark1 = self.logic.findIDFromLabel(self.fidlist, self.landmark1ComboBox.currentText)
+        landmark2 = self.logic.findIDFromLabel(self.fidlist, self.landmark2ComboBox.currentText)
+        landmark3 = self.logic.findIDFromLabel(self.fidlist, self.landmark3ComboBox.currentText)
+        if landmark1 and landmark2 and landmark3:
+            if landmark1 != landmark2 \
+                    and landmark3 != landmark2 \
+                    and landmark3 != landmark1:
+                return True
+        return False
 
     def onRemove(self):
         self.logic.remove()
         self.anglePlanes.RemoveManualPlane(self.id)
 
-    def onFiducialRemoved(self, obj, event):
-        fidlist = obj
-        # Update combo boxes
-        for i in range(1, self.landmark1ComboBox.count):
-            found = self.fiducialInList(self.landmark1ComboBox.itemText(i), fidlist)
-            if not found:
-                self.landmark1ComboBox.removeItem(i)
-                self.landmark2ComboBox.removeItem(i)
-                self.landmark3ComboBox.removeItem(i)
-                break
-        # Update middle point dictionary
-        # Check that the fiducial that was remove was not a middle fiducial
-        for x in self.anglePlanes.middleFiducialDictionary.keys():
-            node = slicer.mrmlScene.GetNodeByID(self.anglePlanes.middleFiducialDictionary[x].nodeID)
-            if node == fidlist:
-                if node.GetMarkupIndexByID(x) == -1:
-                    print "removing fiducial from middlefiducialDictionary"
-                    del self.anglePlanes.middleFiducialDictionary[x]
-                    # continue
-        # If fiducial that is removed is one of the two fiducials defining my middle point,
-        # we also remove the middle point
-        # If this loop removes a markup, this might start an asynchrone job that might modify
-        # the dictionary while we iterate. This would be an issue.
-        middleFiducialDictionary = copy.deepcopy(self.anglePlanes.middleFiducialDictionary)
-        for x in middleFiducialDictionary.keys():
-            node = slicer.mrmlScene.GetNodeByID(middleFiducialDictionary[x].nodeID)
-            p1 = middleFiducialDictionary[x].P1
-            p2 = middleFiducialDictionary[x].P2
-            if node.GetMarkupIndexByID(p1) == -1 or node.GetMarkupIndexByID(p2) == -1:
-                position = node.GetMarkupIndexByID(x)
-                if position != -1:
-                    print "removing middle fiducial because end point has been removed"
-                    node.RemoveMarkup(position)
-                    # No need to remove it from middleFiducialDictionary here as the previous
-                    # call should trigger the call of this function and remove this markup
-                    # from middleFiducialDictionary for us
-
-
-
     def getFiducials(self):
-
-        fidNode = self.logic.getFiducialList()
 
         listCoord = list()
 
         coord = numpy.zeros(3)
-        fidNode.GetNthFiducialPosition(int(self.landmark1ComboBox.currentIndex) - 1, coord)
+        self.fidlist.GetNthFiducialPosition(int(self.landmark1ComboBox.currentIndex) - 1, coord)
         listCoord.append(coord)
 
-        fidNode.GetNthFiducialPosition(int(self.landmark2ComboBox.currentIndex) - 1, coord)
+        self.fidlist.GetNthFiducialPosition(int(self.landmark2ComboBox.currentIndex) - 1, coord)
         listCoord.append(coord)
 
-        fidNode.GetNthFiducialPosition(int(self.landmark3ComboBox.currentIndex) - 1, coord)
+        self.fidlist.GetNthFiducialPosition(int(self.landmark3ComboBox.currentIndex) - 1, coord)
         listCoord.append(coord)
 
         return listCoord
@@ -1170,107 +1085,35 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
                 return True
         return False
 
-    def projectAllFiducials(self):
-        fidlist = self.logic.getFiducialList()
-        for i in range(0, fidlist.GetNumberOfFiducials()):
-            fidid = fidlist.GetNthMarkupID(i)
-            isMiddlePoint = fidid in self.anglePlanes.middleFiducialDictionary.keys()
-            if not isMiddlePoint:
-                self.projectFiducialOnClosestSurface(fidlist, i, self.pointLocatorDictionary)
-
-    def UpdateMiddlePointsPositions(self):
-        current = numpy.zeros(3)
-        for x in self.anglePlanes.middleFiducialDictionary.keys():
-            middleFiducial = self.anglePlanes.middleFiducialDictionary[x]
-            if middleFiducial.nodeID == self.logic.getFiducialList().GetID():
-                node = slicer.mrmlScene.GetNodeByID(middleFiducial.nodeID)
-                self.anglePlanes.computeMidPointPosition(node, middleFiducial.P1, middleFiducial.P2, current)
-                node.RemoveObserver(node.setPointModifiedEventObserverTag)
-                index = node.GetMarkupIndexByID(x)
-                node.SetNthFiducialPosition(index, current[0], current[1], current[2])
-                node.setPointModifiedEventObserverTag = node.AddObserver(node.PointModifiedEvent,
-                                                                           self.onPointModifiedEvent)
-                if middleFiducial.onSurface:
-                    print "middle on surface"
-                    self.projectFiducialOnClosestSurface(node, index, self.pointLocatorDictionary)
-
-    def onPointModifiedEvent(self, obj, event):
-        if self.surfaceDeplacementCheckBox.isChecked():
-            self.projectAllFiducials()
-        self.update()
-
-    def onSurfaceDeplacementStateChanged(self):
-        if self.surfaceDeplacementCheckBox.isChecked():
-            self.projectAllFiducials()
-            self.update()
-
     def onHideSurface(self):
         if self.PlaneIsDefined():
             if self.HidePlaneCheckBox.isChecked():
-                self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                          self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox, 0, self.planeCollection)
+                self.logic.planeLandmarks(self.fidlist,
+                                          self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
+                                          self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
+                                          0, self.planeCollection)
             else:
-                self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                          self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox,
+                self.logic.planeLandmarks(self.fidlist,
+                                          self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
+                                          self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
                                           self.slideOpacity.value, self.planeCollection)
 
     def update(self):
-        self.UpdateMiddlePointsPositions()
         self.planeCollection = self.anglePlanes.planeCollection
         if self.PlaneIsDefined():
-            self.logic.planeLandmarks(self.landmark1ComboBox.currentIndex, self.landmark2ComboBox.currentIndex,
-                                      self.landmark3ComboBox.currentIndex, self.AdaptToBoundingBoxCheckBox, self.slideOpacity.value, self.planeCollection)
-
-    def projectFiducialOnClosestSurface(self, fidlist, fidid, pointLocatorDictionary):
-
-        landmarkCoord = numpy.zeros(3)
-
-        fidlist.GetNthFiducialPosition(fidid, landmarkCoord)
-        minDistance = slicer.sys.float_info.max
-        minClosestPoint = numpy.zeros(3)
-
-        # print "landmark: " + str(landmarkCoord) + ", fidid: " + str(fidid)
-        keys = pointLocatorDictionary.keys()
-        foundCloser = False
-        for i in range(0, len(keys)):
-
-            locator = pointLocatorDictionary[keys[i]]
-
-            closestpointid = locator.FindClosestPoint(landmarkCoord)
-
-            mrmlmodelcollection = slicer.mrmlScene.GetNodesByClassByName("vtkMRMLModelNode", keys[i])
-            modelnode = mrmlmodelcollection.GetItemAsObject(0)
-            if not modelnode:
-                continue
-            poly = modelnode.GetPolyData()
-            if poly is None or not hasattr(poly, 'GetPoints'): #  It will be equal to None if object does not contain a polydata
-                continue
-            closestpoint = poly.GetPoints().GetPoint(closestpointid)
-            #print "closestpointid:" + str(closestpointid) + ", point: " + str(closestpoint)
-
-            distance = numpy.linalg.norm(closestpoint - landmarkCoord)
-
-            #print "distance: " + str(distance)
-
-            if distance < minDistance:
-                foundCloser = True
-                minDistance = distance
-                minClosestPoint = closestpoint
-        if foundCloser:
-            if minClosestPoint[0] != landmarkCoord[0] or minClosestPoint[1] != landmarkCoord[1] or minClosestPoint[2] != \
-                    landmarkCoord[2]:
-                fidlist.RemoveObserver(fidlist.setPointModifiedEventObserverTag)
-                fidlist.SetNthFiducialPosition(fidid, minClosestPoint[0], minClosestPoint[1], minClosestPoint[2])
-                fidlist.setPointModifiedEventObserverTag = fidlist.AddObserver(fidlist.PointModifiedEvent,
-                                                                           self.onPointModifiedEvent)
+            self.logic.planeLandmarks(self.fidlist,
+                                      self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
+                                      self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
+                                      self.slideOpacity.value, self.planeCollection)
 
     def addLandMarkClicked(self):
-        # print "Add landmarks"
-        # # Place landmarks in the 3D scene
-        fidlist = self.logic.getFiducialList()
+        print "Add landmarks"
+        self.anglePlanes.inputModelSelector.setCurrentNode(slicer.app.mrmlScene().GetNodeByID(self.fidlist.GetAttribute("connectedModelID")))
+        self.anglePlanes.inputLandmarksSelector.setCurrentNode(self.fidlist)
+        # Place landmarks in the 3D scene
         selectionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLSelectionNodeSingleton")
         selectionNode.SetReferenceActivePlaceNodeClassName("vtkMRMLMarkupsFiducialNode")
-        selectionNode.SetActivePlaceNodeID(fidlist.GetID())
+        selectionNode.SetActivePlaceNodeID(self.fidlist.GetID())
         # print selectionNode
         interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
         interactionNode.SetCurrentInteractionMode(1)
@@ -1278,15 +1121,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         # on the "place fiducial" button multiple times
         placeModePersistence = 0
         interactionNode.SetPlaceModePersistence(placeModePersistence)
-
-    def onFiducialAdded(self, obj, event):
-        fidlist = obj
-        label = fidlist.GetNthFiducialLabel(fidlist.GetNumberOfFiducials() - 1)
-
-        self.landmark1ComboBox.addItem(label)
-        self.landmark2ComboBox.addItem(label)
-        self.landmark3ComboBox.addItem(label)
-
 
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     try:
@@ -1310,15 +1144,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             return
         if not self.selectedModel:
             return
+        print "UpdateThreeDView"
         active = self.selectedFidList
-        landmarkDescription = self.decodeJSON(active.GetAttribute("landmarkDescription"))
+        #deactivate all landmarks
+        list = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsFiducialNode")
+        end = list.GetNumberOfItems()
         selectedFidReflID = self.findIDFromLabel(active,landmarkLabel)
-        for key in landmarkDescription.iterkeys():
-            markupsIndex = active.GetMarkupIndexByID(key)
-            if key != selectedFidReflID:
-                active.SetNthMarkupLocked(markupsIndex, True)
-            else:
-                active.SetNthMarkupLocked(markupsIndex, False)
+        for i in range(0,end):
+            fidList = list.GetItemAsObject(i)
+            landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
+            for key in landmarkDescription.iterkeys():
+                markupsIndex = fidList.GetMarkupIndexByID(key)
+                if key != selectedFidReflID:
+                    fidList.SetNthMarkupLocked(markupsIndex, True)
+                else:
+                    fidList.SetNthMarkupLocked(markupsIndex, False)
         displayNode = self.selectedModel.GetModelDisplayNode()
         displayNode.SetScalarVisibility(False)
         if selectedFidReflID != False:
@@ -1538,7 +1378,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         else:
             self.createNewDataStructure(landmarks, model, onSurface)
         #update of the landmark Combo Box
-        self.updateAllLandmarkComboBox(landmarks)
+        self.updateLandmarkComboBox(landmarks, self.interface.landmarkComboBox)
         #adding of listeners
         MarkupAddedEventTag = landmarks.AddObserver(landmarks.MarkupAddedEvent, self.onMarkupAddedEvent)
         landmarks.SetAttribute("MarkupAddedEventTag",self.encodeJSON({"MarkupAddedEventTag":MarkupAddedEventTag}))
@@ -1554,7 +1394,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         numOfMarkups = obj.GetNumberOfMarkups()
         markupID = obj.GetNthMarkupID(numOfMarkups - 1)
         landmarkDescription[markupID] = dict()
-        landmarkLabel = obj.GetName() + '-' + str(numOfMarkups)
+        landmarkLabel = obj.GetNthMarkupLabel(numOfMarkups - 1)
         landmarkDescription[markupID]["landmarkLabel"] = landmarkLabel
         landmarkDescription[markupID]["ROIradius"] = 0
         landmarkDescription[markupID]["projection"] = dict()
@@ -1566,7 +1406,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         landmarkDescription[markupID]["midPoint"]["Point1"] = None
         landmarkDescription[markupID]["midPoint"]["Point2"] = None
         obj.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
-        self.updateAllLandmarkComboBox(obj)
+        self.updateAllLandmarkComboBox(obj, markupID)
         self.interface.UpdateInterface()
 
     def updateMidPoint(self, fidList, landmarkID):
@@ -1622,25 +1462,47 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             if not isFound:
                 IDs.append(ID)
         for ID in IDs:
+            self.deleteLandmark(obj, landmarkDescription[ID]["landmarkLabel"])
             landmarkDescription.pop(ID,None)
         obj.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
-        self.updateAllLandmarkComboBox(obj)
 
-    def updateLandmarkComboBox(self, fidList, combobox):
-        combobox.clear()
-        print combobox
-        print "clear"
+
+    def addLandmarkToCombox(self, fidList, combobox, markupID):
         if not fidList:
             return
         landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
-        for key in landmarkDescription:
-            combobox.addItem(landmarkDescription[key]["landmarkLabel"])
-            print "add" + landmarkDescription[key]["landmarkLabel"]
-        combobox.setCurrentIndex(self.interface.landmarkComboBox.count - 1)
+        combobox.addItem(landmarkDescription[markupID]["landmarkLabel"])
 
-    def updateAllLandmarkComboBox(self, fidList):
+    def updateAllLandmarkComboBox(self, fidList, markupID):
         # update of the Combobox that are always updated
         self.updateLandmarkComboBox(fidList, self.interface.landmarkComboBox)
+        for planeControls in self.interface.planeControlsDictionary.values():
+            if planeControls.fidlist is fidList:
+                self.addLandmarkToCombox(fidList, planeControls.landmark1ComboBox, markupID)
+                self.addLandmarkToCombox(fidList, planeControls.landmark2ComboBox, markupID)
+                self.addLandmarkToCombox(fidList, planeControls.landmark3ComboBox, markupID)
+
+    def updateLandmarkComboBox(self, fidList, combobox):
+        combobox.blockSignals(True)
+        combobox.clear()
+        if not fidList:
+            return
+        numOfFid = fidList.GetNumberOfMarkups()
+        if numOfFid > 0:
+            for i in range(0, numOfFid):
+                landmarkLabel = fidList.GetNthMarkupLabel(i)
+                combobox.addItem(landmarkLabel)
+        combobox.setCurrentIndex(self.interface.landmarkComboBox.count - 1)
+        combobox.blockSignals(False)
+
+    def deleteLandmark(self, fidList, label):
+        # update of the Combobox that are always updated
+        self.interface.landmarkComboBox.removeItem(self.interface.landmarkComboBox.findText(label))
+        for planeControls in self.interface.planeControlsDictionary.values():
+            if planeControls.fidlist is fidList:
+                planeControls.landmark1ComboBox.removeItem(planeControls.landmark1ComboBox.findText(label))
+                planeControls.landmark2ComboBox.removeItem(planeControls.landmark2ComboBox.findText(label))
+                planeControls.landmark3ComboBox.removeItem(planeControls.landmark3ComboBox.findText(label))
 
     def findIDFromLabel(self, fidList, landmarkLabel):
         # find the ID of the markupsNode from the label of a landmark!
@@ -1708,7 +1570,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def getMatrix(self, slice):
         self.mat = slice.GetSliceToRAS()
-        print self.mat
+        # print self.mat
         # ---------------------- RED SLICE -----------------------#
         # Matrix with the elements of SliceToRAS
         m = numpy.matrix([[self.mat.GetElement(0, 0), self.mat.GetElement(0, 1), self.mat.GetElement(0, 2),
@@ -1835,9 +1697,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         Vn[1] = GA[2] * GB[0] - GA[0] * GB[2]
         Vn[2] = GA[0] * GB[1] - GA[1] * GB[0]
 
-        # print "Vn = ",Vn
+        #print "Vn = ",Vn
 
         norm_Vn = sqrt(Vn[0] * Vn[0] + Vn[1] * Vn[1] + Vn[2] * Vn[2])
+
+        #print "norm_Vn = ",norm_Vn
 
         Normal = Vn / norm_Vn
 
@@ -1845,49 +1709,41 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         return Normal
 
-    def planeLandmarks(self, Landmark1Value, Landmark2Value, Landmark3Value, AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection):
+    def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label, AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
-        fidNode = self.getFiducialList()
+        landmark1ID = self.findIDFromLabel(fidList, Landmark1Label)
+        landmark2ID = self.findIDFromLabel(fidList, Landmark2Label)
+        landmark3ID = self.findIDFromLabel(fidList, Landmark3Label)
+
+        if not (landmark1ID and landmark2ID and landmark3ID):
+            print "landmark not defined"
+            return
 
         if AdaptToBoundingBoxCheckBox.isChecked():
             slider = 10000
         else:
             slider = 1
 
-        r1 = 0
-        a1 = 0
-        s1 = 0
         coord = numpy.zeros(3)
-
-        if Landmark1Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark1Value) - 1, coord)
-            r1 = coord[0]
-            a1 = coord[1]
-            s1 = coord[2]
-
-
-        # Limit the number of 3 landmarks to define a plane
-        # Keep the coordinates of the landmarks
-        r2 = 0
-        a2 = 0
-        s2 = 0
-        if Landmark2Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark2Value) - 1, coord)
-            r2 = coord[0]
-            a2 = coord[1]
-            s2 = coord[2]
-
-        # Limit the number of 3 landmarks to define a plane
-        # Keep the coordinates of the landmarks
-        r3 = 0
-        a3 = 0
-        s3 = 0
-        if Landmark3Value != 0:
-            fidNode.GetNthFiducialPosition(int(Landmark3Value) - 1, coord)
-            r3 = coord[0]
-            a3 = coord[1]
-            s3 = coord[2]
+        landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
+        fidList.GetNthFiducialPosition(landmark1Index, coord)
+        #print "Landmark1Value: ", coord
+        r1 = coord[0]
+        a1 = coord[1]
+        s1 = coord[2]
+        landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
+        fidList.GetNthFiducialPosition(landmark2Index, coord)
+        #print "Landmark2Value: ", coord
+        r2 = coord[0]
+        a2 = coord[1]
+        s2 = coord[2]
+        landmark3Index = fidList.GetMarkupIndexByID(landmark3ID)
+        fidList.GetNthFiducialPosition(landmark3Index, coord)
+        #print "Landmark3Value: ", coord
+        r3 = coord[0]
+        a3 = coord[1]
+        s3 = coord[2]
 
         points = self.points
         if points.GetNumberOfPoints() == 0:
@@ -1898,6 +1754,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             points.SetPoint(0, r1, a1, s1)
             points.SetPoint(1, r2, a2, s2)
             points.SetPoint(2, r3, a3, s3)
+        #print "points ", points
 
         polydata = self.polydata
         polydata.SetPoints(points)
@@ -1909,7 +1766,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         G = centerOfMass.GetCenter()
 
-        # print "Center of mass = ",G
+        #print "Center of mass = ",G
 
         A = (r1, a1, s1)
         B = (r2, a2, s2)
@@ -1975,6 +1832,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         planeSource.Update()
 
         if AdaptToBoundingBoxCheckBox.isChecked():
+
             clipper = vtk.vtkClipClosedSurface()
             clipper.SetClippingPlanes(planeCollection)
             clipper.SetInputData(planeSource.GetOutput())
@@ -2005,6 +1863,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             renderWindow[i].AddRenderer(renderer[i])
             renderer[i].Render()
             renderWindow[i].Render()
+            print "Plane should appear"
 
     def GetConnectedVertices(self, connectedVerticesIDList, polyData, pointID):
         # Return IDs of all the vertices that compose the first neighbor.
