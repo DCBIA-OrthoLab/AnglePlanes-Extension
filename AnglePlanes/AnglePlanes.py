@@ -261,7 +261,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.CollapsibleButton2 = ctk.ctkCollapsibleButton()
         self.CollapsibleButton2.text = "Results"
         self.layout.addWidget(self.CollapsibleButton2)
-        sampleFormLayout2 = qt.QFormLayout(self.CollapsibleButton2)
+        sampleFormLayout2 = qt.QVBoxLayout()
+        self.CollapsibleButton2.setLayout(sampleFormLayout2)
 
         self.results = qt.QPushButton("Results")
         self.results.connect('clicked()', self.angleValue)
@@ -336,7 +337,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox2.connect('currentIndexChanged(QString)', self.valueComboBox)
         # Setting combo boxes at different values/index otherwise infinite loop
         self.planeComboBox1.setCurrentIndex(0)
-        self.planeComboBox2.setCurrentIndex(1)
+        self.planeComboBox2.setCurrentIndex(0)
         self.valueComboBox()
 
         save.connect('clicked(bool)', self.onSavePlanes)
@@ -452,8 +453,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         planeComboBox.addItem("Red")
         planeComboBox.addItem("Yellow")
         planeComboBox.addItem("Green")
-        print self.planeControlsDictionary
         try:
+            print self.planeControlsDictionary
             for x in self.planeControlsDictionary.keys():
                 if self.planeControlsDictionary[x].PlaneIsDefined():
                     planeComboBox.addItem(x)
@@ -499,7 +500,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
                 planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
-                                          planeControls.landmark3ComboBox.currentText, planeControls.slider.value, planeControls.slideOpacity.value, self.planeCollection)
+                                          planeControls.landmark3ComboBox.currentText, planeControls.AdaptToBoundingBoxCheckBox, planeControls.slideOpacity.value, self.planeCollection)
         self.valueComboBox()
         self.onComputeBox()
 
@@ -514,7 +515,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for planeControls in self.planeControlsDictionary.values():
             if planeControls.PlaneIsDefined():
                 planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
-                                          planeControls.landmark3ComboBox.currentText, planeControls.slider.value, 0, self.planeCollection)
+                                          planeControls.landmark3ComboBox.currentText,planeControls.AdaptToBoundingBoxCheckBox ,planeControls.slideOpacity.value, self.planeCollection)
         # Hide planes
         for x in self.logic.ColorNodeCorrespondence.keys():
             compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
@@ -534,8 +535,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.planeControlsId = keyLoad
         else:
             self.planeControlsId += 1
-        if len(self.planeControlsDictionary) >= 1:
-            self.addPlaneButton.setDisabled(True)
+        # if len(self.planeControlsDictionary) >= 1:
+        #     self.addPlaneButton.setDisabled(True)
         planeControls = AnglePlanesWidgetPlaneControl(self,
                                                       self.planeControlsId,
                                                       self.planeCollection,
@@ -543,25 +544,28 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.managePlanesFormLayout.addRow(planeControls)
 
         key = "Plane " + str(self.planeControlsId)
-        print self.planeControlsDictionary
         self.planeControlsDictionary[key] = planeControls
-        print self.planeControlsDictionary
         self.updatePlanesComboBoxes()
         self.midPointGroupBox.setDisabled(False)
         self.selectPlaneForMidPoint.addItem(key)
 
     def RemoveManualPlane(self, id):
+        print "--- Remove a plan ---"
         key = "Plane " + str(id)
         # If the plane has already been removed (for example, when removing this plane in this function,
         # the callback on removing the nodes will be called, and therefore this function will be called again
         # We need to not do anything the second time this function is called for the same plane
         if key not in self.planeControlsDictionary.keys():
+            print "Key error"
             return
         fiducialList = slicer.util.getNode('P' + str(id))
         planeControls = self.planeControlsDictionary[key]
         self.managePlanesFormLayout.removeWidget(planeControls)
-        self.planeControlsDictionary[key].deleteLater()
+        planeControls.deleteLater()
+        planeControls.logic.remove()
+        print self.planeControlsDictionary
         self.planeControlsDictionary.pop(key)
+        print self.planeControlsDictionary
         self.addPlaneButton.setDisabled(False)
         if len(self.planeControlsDictionary.keys()) == 0:
             self.midPointGroupBox.setDisabled(True)
@@ -799,10 +803,19 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def onCloseScene(self, obj, event):
         self.middleFiducialDictionary = dict()
         self.colorSliceVolumes = dict()
+        list = slicer.mrmlScene.GetNodesByClass("vtkMRMLModelNode")
+        end = list.GetNumberOfItems()
+        for i in range(0,end):
+            model = list.GetItemAsObject(i)
+            hardenModel = slicer.mrmlScene.GetNodesByName(model.GetName()).GetItemAsObject(0)
+            slicer.mrmlScene.RemoveNode(hardenModel)
         keys = self.planeControlsDictionary.keys()
-        for x in keys[len('Plane '):]:
-            self.RemoveManualPlane(x)
+        print keys
+        for x in keys:
+            print x[len('Plane '):]
+            self.RemoveManualPlane(x[len('Plane '):])
         self.planeControlsDictionary = dict()
+        self.addPlaneButton.setDisabled(True)
             # globals()[self.moduleName] = slicer.util.reloadScriptedModule(self.moduleName)
 
     def angleValue(self):
@@ -816,11 +829,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def setFirstItemInComboBoxNotGivenString(self, comboBox, oldString, noThisString):
         if comboBox.findText(oldString) == -1:
-            allItems = [comboBox.itemText(i) for i in range(comboBox.count)]
-            for i in allItems:
-                if i != noThisString:
-                    comboBox.setCurrentIndex(comboBox.findText(i))
-                    break
+            comboBox.setCurrentIndex(1)
         else:
             comboBox.setCurrentIndex(comboBox.findText(oldString))
 
@@ -833,8 +842,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         # Reset Combo boxes
         self.fillColorsComboBox(self.planeComboBox1)
         self.fillColorsComboBox(self.planeComboBox2)
-        self.planeComboBox2.removeItem(self.planeComboBox2.findText(colorPlane1))
-        self.planeComboBox1.removeItem(self.planeComboBox1.findText(colorPlane2))
+        if colorPlane1 != "None":
+            self.planeComboBox2.removeItem(self.planeComboBox2.findText(colorPlane1))
+        if colorPlane2 != "None":
+            self.planeComboBox1.removeItem(self.planeComboBox1.findText(colorPlane2))
         self.setFirstItemInComboBoxNotGivenString(self.planeComboBox1, colorPlane1, colorPlane2)
         self.setFirstItemInComboBoxNotGivenString(self.planeComboBox2, colorPlane2, colorPlane1)
         self.planeComboBox1.blockSignals(False)
@@ -858,26 +869,28 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def defineAngle(self, colorPlane1, colorPlane2):
         # print colorPlane1
-        if colorPlane1 in self.logic.ColorNodeCorrespondence:
-            slice1 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane1])
-            self.logic.getMatrix(slice1)
-            slice1.SetWidgetVisible(True)
-            slice1.SetSliceVisible(True)
-            matrix1 = self.logic.getMatrix(slice1)
-            normal1 = self.logic.defineNormal(matrix1)
-        else:
-            normal1 = self.planeControlsDictionary[colorPlane1].logic.N
+        if colorPlane1 != "None":
+            if colorPlane1 in self.logic.ColorNodeCorrespondence:
+                slice1 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane1])
+                self.logic.getMatrix(slice1)
+                slice1.SetWidgetVisible(True)
+                slice1.SetSliceVisible(True)
+                matrix1 = self.logic.getMatrix(slice1)
+                normal1 = self.logic.defineNormal(matrix1)
+            else:
+                normal1 = self.planeControlsDictionary[colorPlane1].logic.N
         # print colorPlane2
-        if colorPlane2 in self.logic.ColorNodeCorrespondence:
-            slice2 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane2])
-            self.logic.getMatrix(slice2)
-            slice2.SetWidgetVisible(True)
-            slice2.SetSliceVisible(True)
-            matrix2 = self.logic.getMatrix(slice2)
-            normal2 = self.logic.defineNormal(matrix2)
-        else:
-            normal2 = self.planeControlsDictionary[colorPlane2].logic.N
-        self.logic.getAngle(normal1, normal2)
+        if colorPlane2 != "None":
+            if colorPlane2 in self.logic.ColorNodeCorrespondence:
+                slice2 = slicer.util.getNode(self.logic.ColorNodeCorrespondence[colorPlane2])
+                self.logic.getMatrix(slice2)
+                slice2.SetWidgetVisible(True)
+                slice2.SetSliceVisible(True)
+                matrix2 = self.logic.getMatrix(slice2)
+                normal2 = self.logic.defineNormal(matrix2)
+            else:
+                normal2 = self.planeControlsDictionary[colorPlane2].logic.N
+            self.logic.getAngle(normal1, normal2)
 
     def onSavePlanes(self):
         self.savePlanes()
