@@ -87,8 +87,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeControlsId = 0
         self.planeControlsDictionary = {}
         self.planeCollection = vtk.vtkPlaneCollection()
-        #self.midPointFiducialDictionaryID = {}
-        # self.logic.initializePlane()
         self.ignoredNodeNames = ('Red Volume Slice', 'Yellow Volume Slice', 'Green Volume Slice')
         self.colorSliceVolumes = dict()
         self.n_vector = numpy.matrix([[0], [0], [1], [1]])
@@ -229,19 +227,14 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         landmark1Layout.addRow('Landmark B: ', self.landmarkComboBox2MidPoint)
         self.midPointOnSurfaceCheckBox = qt.QCheckBox('On Surface')
         self.defineMiddlePointButton = qt.QPushButton(' Add middle point ')
-        self.defineRemoveMiddlePointButton = qt.QPushButton(' Remove middle point ')
+        self.defineMiddlePointButton.setSizePolicy(3,1)
         middlePointLayout = qt.QHBoxLayout()
         middlePointLayout.addWidget(self.defineMiddlePointButton)
-        middlePointLayout.addWidget(self.defineRemoveMiddlePointButton)
         middlePointLayout.addWidget(self.midPointOnSurfaceCheckBox)
         landmark1Layout.addRow(middlePointLayout)
         self.midPointGroupBox.setLayout(landmark1Layout)
         self.midPointGroupBox.setDisabled(True)
         self.defineMiddlePointButton.connect('clicked()', self.onAddMidPoint)
-        self.defineRemoveMiddlePointButton.connect('clicked()', self.onRemoveMidPoint)
-        self.landmarkComboBox1MidPoint.connect('currentIndexChanged(int)', self.onUpdateMidPoint)
-        self.landmarkComboBox2MidPoint.connect('currentIndexChanged(int)', self.onUpdateMidPoint)
-        self.midPointOnSurfaceCheckBox.connect('stateChanged(int)', self.onSurfaceMidPointStateChanged)
 
         # -------- Calculate angles between planes ------------
 
@@ -348,9 +341,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         for i in self.getPositionOfModelNodes(False):
             modelnode = slicer.mrmlScene.GetNthNodeByClass(i, "vtkMRMLModelNode")
             modelnode.AddObserver(modelnode.DisplayModifiedEvent, self.onChangeModelDisplay)
-        self.middleFiducialDictionary = dict()
         ModelAddedClass(self)
-        self.onUpdateMidPoint()
 
     def UpdateInterface(self):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
@@ -405,44 +396,14 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             landmarkDescription[selectedFidReflID]["ROIradius"] = 0
         fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
 
-
-    def canAddMiddlePoint(self):
-        if self.landmarkComboBox1MidPoint.currentText == self.landmarkComboBox2MidPoint.currentText\
-                or self.landmarkComboBox1MidPoint.count == 0 or self.landmarkComboBox2MidPoint.count == 0:
-            return False
-        else:
-            return True
-
-    def onUpdateMidPoint(self, remove=False):
-        if self.currentMidPointExists(remove):
-            self.defineRemoveMiddlePointButton.setDisabled(False)
-            self.defineMiddlePointButton.setDisabled(True)
-        else:
-            self.defineRemoveMiddlePointButton.setDisabled(True)
-            self.defineMiddlePointButton.setDisabled(False)
-        disableMiddlePointSurfaceCheckbox = False
-        if not self.canAddMiddlePoint():
-            self.defineMiddlePointButton.setDisabled(True)
-        self.updateOnSurfaceCheckBoxes()
-
-    def onSurfaceMidPointStateChanged(self):
-        key = self.getCurrentMidPointFiducialStructure()
-        if key != '':
-            self.middleFiducialDictionary[key].onSurface = self.midPointOnSurfaceCheckBox.isChecked()
-            if self.selectPlaneForMidPoint.currentText in self.planeControlsDictionary.keys():
-                self.planeControlsDictionary[self.selectPlaneForMidPoint.currentText].update()
-
     def onChangeMiddlePointFiducialNode(self):
-        for x in [self.landmarkComboBox1MidPoint, self.landmarkComboBox2MidPoint]:
-            current = x.currentText
-            x.clear()
-            node = self.selectedMiddlePointPlane()
-            if not node:
-                return
-            for i in range(0, node.GetNumberOfMarkups()):
-                x.addItem(node.GetNthFiducialLabel(i))
-            if x.findText(current) > -1:
-                x.setCurrentIndex(x.findText(current))
+        key = self.selectPlaneForMidPoint.currentText
+        if key is "":
+            return
+        plane = self.planeControlsDictionary[key]
+        fidList = plane.fidlist
+        self.logic.updateLandmarkComboBox(fidList, self.landmarkComboBox1MidPoint)
+        self.logic.updateLandmarkComboBox(fidList, self.landmarkComboBox2MidPoint)
 
     def onChangeModelDisplay(self, obj, event):
         self.updateOnSurfaceCheckBoxes()
@@ -462,21 +423,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def updateOnSurfaceCheckBoxes(self):
         numberOfVisibleModels = len(self.getPositionOfModelNodes(True))
-        # if they are new models and if they are visible, allow to select "on surface" to place new fiducials
         if numberOfVisibleModels > 0:
             self.computeBox.setDisabled(False)
-            if self.currentMidPointExists():
-                key = self.getCurrentMidPointFiducialStructure()
-                self.midPointOnSurfaceCheckBox.setDisabled(False)
-                self.midPointOnSurfaceCheckBox.setChecked(self.middleFiducialDictionary[key].onSurface)
-            else:
-                self.midPointOnSurfaceCheckBox.setChecked(False)
-                self.midPointOnSurfaceCheckBox.setDisabled(True)
-        # else there are no visible models or if they are not visible, disable "on surface" to place new fiducials
         else:
             self.computeBox.setDisabled(True)
-            self.midPointOnSurfaceCheckBox.setDisabled(True)
-            self.midPointOnSurfaceCheckBox.setChecked(False)
 
     def getPositionOfModelNodes(self, onlyVisible):
         numNodes = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
@@ -562,9 +512,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.managePlanesFormLayout.removeWidget(planeControls)
         planeControls.deleteLater()
         planeControls.logic.remove()
-        print self.planeControlsDictionary
         self.planeControlsDictionary.pop(key)
-        print self.planeControlsDictionary
         self.addPlaneButton.setDisabled(False)
         if len(self.planeControlsDictionary.keys()) == 0:
             self.midPointGroupBox.setDisabled(True)
@@ -690,39 +638,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         sampleVolumeNode.SetSaveWithScene(False)
         return sampleVolumeNode
 
-    def selectedMiddlePointPlane(self):
-        if self.selectPlaneForMidPoint.currentText not in self.planeControlsDictionary.keys():
-            return None
-        id = self.planeControlsDictionary[self.selectPlaneForMidPoint.currentText].id
-        markupNodeName = 'P' + str(id)
-        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', markupNodeName)
-        node = nodes.GetItemAsObject(0)
-        return node
-
-    def computeMidPointPosition(self, node, p1ID, p2ID, coord):
-        f = list()
-        f.append(type('obj', (object,), {'ID': p1ID, 'coordinates': numpy.zeros(3)}))
-        f.append(type('obj', (object,), {'ID': p2ID, 'coordinates': numpy.zeros(3)}))
-
-        if not node:
-            return 1
-        found = 0
-        for j in (0,1):
-            fid = node.GetMarkupIndexByID(f[j].ID)
-            if fid != -1:
-                current = numpy.zeros(3)
-                node.GetNthFiducialPosition(fid, current)
-                f[j].coordinates = current
-                found += 1
-        if not found == 2:
-            print "Error: Fiducials not found in lists"
-            return 1
-        current = f[0].coordinates + f[1].coordinates
-        current /= 2
-        for i in range(0,3):
-            coord[i] = current[i]
-        return 0
-
     def getFiducialIDFromName(self, node, name):
         for i in range(0, node.GetNumberOfMarkups()):
             if name == node.GetNthFiducialLabel(i):
@@ -730,68 +645,33 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         return ''
 
     def onAddMidPoint(self):
-        if self.currentMidPointExists():
-            print "Mid point already exists"
-            return
-        node = self.selectedMiddlePointPlane()
-        f = list()
-        f.append(type('obj', (object,), {'name': self.landmarkComboBox1MidPoint.currentText, 'ID': ""}))
-        f.append(type('obj', (object,), {'name': self.landmarkComboBox2MidPoint.currentText, 'ID': ""}))
-        for j in (0,1):
-            f[j].ID = self.getFiducialIDFromName(node, f[j].name)
-        if '' in [f[0].ID, f[1].ID]:
-            print "Error: Fiducials not found in lists"
-            return
-        coordinates = numpy.zeros(3)
-        self.computeMidPointPosition(node, f[0].ID, f[1].ID, coordinates)
-        node.AddFiducial(coordinates[0], coordinates[1], coordinates[2], f[0].name+"-"+f[1].name+"-mid-pt")
-        newFiducial = node.GetNumberOfMarkups() - 1
-        node.SetNthFiducialSelected(newFiducial, False)
-        node.SetNthMarkupLocked(newFiducial, True)
-        middleFiducial = AnglePlanesMiddleFiducial(f[0].ID, f[1].ID, self.midPointOnSurfaceCheckBox.isChecked(), node.GetID())
-        self.middleFiducialDictionary[node.GetNthMarkupID(newFiducial)] = middleFiducial
-        self.onUpdateMidPoint()
-
-    def currentMidPointExists(self, remove=False):
-        for x in self.middleFiducialDictionary.keys():
-            node = self.selectedMiddlePointPlane()
-            middleFiducial = self.middleFiducialDictionary[x]
-            if node.GetID() == middleFiducial.nodeID:
-                P1 = middleFiducial.P1
-                P2 = middleFiducial.P2
-                L1 = self.getFiducialIDFromName(node, self.landmarkComboBox1MidPoint.currentText)
-                L2 = self.getFiducialIDFromName(node, self.landmarkComboBox2MidPoint.currentText)
-                if P1 == L1 and P2 == L2 or P1 == L2 and P2 == L1:
-                    if remove is True:
-                        node.RemoveMarkup(node.GetMarkupIndexByID(x))
-                        return False
-                    else:
-                        return True
-        return False
-
-    def getCurrentMidPointFiducialStructure(self):
-        if self.currentMidPointExists():
-            for x in self.middleFiducialDictionary.keys():
-                node = self.selectedMiddlePointPlane()
-                middleFiducial = self.middleFiducialDictionary[x]
-                if node.GetID() == middleFiducial.nodeID:
-                    P1 = middleFiducial.P1
-                    P2 = middleFiducial.P2
-                    L1 = self.getFiducialIDFromName(node, self.landmarkComboBox1MidPoint.currentText)
-                    L2 = self.getFiducialIDFromName(node, self.landmarkComboBox2MidPoint.currentText)
-                    if P1 == L1 and P2 == L2 or P1 == L2 and P2 == L1:
-                        return x
-        return ''
-
-    def onRemoveMidPoint(self):
-        self.onUpdateMidPoint(True)
-
-    def onFiducialChangedMidPoint(self, obj, event):
-        fidlist = obj
-        node = self.selectedMiddlePointPlane()
-        if not node or not fidlist == node:
-            return
-        self.onChangeMiddlePointFiducialNode()
+        key = self.selectPlaneForMidPoint.currentText
+        plane = self.planeControlsDictionary[key]
+        fidList = plane.fidlist
+        if not fidList:
+            self.logic.warningMessage("Fiducial list problem.")
+        landmark1ID = self.logic.findIDFromLabel(fidList,self.landmarkComboBox1MidPoint.currentText)
+        landmark2ID = self.logic.findIDFromLabel(fidList,self.landmarkComboBox2MidPoint.currentText)
+        coord = self.logic.calculateMidPointCoord(fidList, landmark1ID, landmark2ID)
+        fidList.AddFiducial(coord[0],coord[1],coord[2])
+        # update of the data structure
+        landmarkDescription = self.logic.decodeJSON(fidList.GetAttribute("landmarkDescription"))
+        numOfMarkups = fidList.GetNumberOfMarkups()
+        markupID = fidList.GetNthMarkupID(numOfMarkups - 1)
+        landmarkDescription[landmark1ID]["midPoint"]["definedByThisMarkup"].append(markupID)
+        landmarkDescription[landmark2ID]["midPoint"]["definedByThisMarkup"].append(markupID)
+        landmarkDescription[markupID]["midPoint"]["isMidPoint"] = True
+        landmarkDescription[markupID]["midPoint"]["Point1"] = landmark1ID
+        landmarkDescription[markupID]["midPoint"]["Point2"] = landmark2ID
+        if self.midPointOnSurfaceCheckBox.isChecked():
+            landmarkDescription[markupID]["projection"]["isProjected"] = True
+            hardenModel = slicer.app.mrmlScene().GetNodeByID(fidList.GetAttribute("hardenModelID"))
+            landmarkDescription[markupID]["projection"]["closestPointIndex"] = \
+                self.logic.projectOnSurface(hardenModel, fidList, markupID)
+        else:
+            landmarkDescription[markupID]["projection"]["isProjected"] = False
+        fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
+        self.logic.interface.UpdateInterface()
 
     def fiducialInList(self, name, fidlist):
         for i in range(0, fidlist.GetNumberOfFiducials()):
@@ -800,7 +680,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         return False
 
     def onCloseScene(self, obj, event):
-        self.middleFiducialDictionary = dict()
         self.colorSliceVolumes = dict()
         list = slicer.mrmlScene.GetNodesByClass("vtkMRMLModelNode")
         end = list.GetNumberOfItems()
@@ -1503,6 +1382,12 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                 self.addLandmarkToCombox(fidList, planeControls.landmark1ComboBox, markupID)
                 self.addLandmarkToCombox(fidList, planeControls.landmark2ComboBox, markupID)
                 self.addLandmarkToCombox(fidList, planeControls.landmark3ComboBox, markupID)
+        key = self.interface.selectPlaneForMidPoint.currentText
+        plane = self.interface.planeControlsDictionary[key]
+        midFidList = plane.fidlist
+        if midFidList == fidList:
+            self.addLandmarkToCombox(fidList, self.interface.landmarkComboBox1MidPoint, markupID)
+            self.addLandmarkToCombox(fidList, self.interface.landmarkComboBox2MidPoint, markupID)
 
     def updateLandmarkComboBox(self, fidList, combobox):
         combobox.blockSignals(True)
