@@ -57,7 +57,7 @@ class AnglePlanes(ScriptedLoadableModule):
         parent.title = "Angle Planes"
         parent.categories = ["Shape Analysis"]
         parent.dependencies = []
-        parent.contributors = ["Julia Lopinto", "Juan Carlos Prieto", "Francois Budin"]
+        parent.contributors = ["Julia Lopinto", "Juan Carlos Prieto", "Francois Budin", "Jean-Baptiste Vimort"]
         parent.helpText = """
             This Module is used to calculate the angle between two planes by using the normals.
             The user gets the choice to use two planes which are already implemented on Slicer
@@ -454,7 +454,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         planeComboBox.addItem("Yellow")
         planeComboBox.addItem("Green")
         try:
-            print self.planeControlsDictionary
             for x in self.planeControlsDictionary.keys():
                 if self.planeControlsDictionary[x].PlaneIsDefined():
                     planeComboBox.addItem(x)
@@ -810,9 +809,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             hardenModel = slicer.mrmlScene.GetNodesByName(model.GetName()).GetItemAsObject(0)
             slicer.mrmlScene.RemoveNode(hardenModel)
         keys = self.planeControlsDictionary.keys()
-        print keys
         for x in keys:
-            print x[len('Plane '):]
             self.RemoveManualPlane(x[len('Plane '):])
         self.planeControlsDictionary = dict()
         self.addPlaneButton.setDisabled(True)
@@ -1380,6 +1377,12 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             print "removing observers removed!"
         except:
             pass
+        try:
+            tag = self.decodeJSON(landmarks.GetAttribute("UpdatesPlanesEventTag"))
+            landmarks.RemoveObserver(tag["UpdatesPlanesEventTag"])
+            print "Planes observers removed!"
+        except:
+            pass
         if connectedModelID:
             if connectedModelID != model.GetID():
                 if self.connectedModelChangement():
@@ -1399,6 +1402,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         landmarks.SetAttribute("PointModifiedEventTag",self.encodeJSON({"PointModifiedEventTag":PointModifiedEventTag}))
         MarkupRemovedEventTag = landmarks.AddObserver(landmarks.MarkupRemovedEvent, self.onMarkupRemovedEvent)
         landmarks.SetAttribute("MarkupRemovedEventTag",self.encodeJSON({"MarkupRemovedEventTag":MarkupRemovedEventTag}))
+        UpdatesPlanesEventTag = landmarks.AddObserver(landmarks.PointModifiedEvent, self.updatePlanesEvent)
+        landmarks.SetAttribute("UpdatesPlanesEventTag",self.encodeJSON({"UpdatesPlanesEventTag":UpdatesPlanesEventTag}))
 
     # Called when a landmark is added on a model
     def onMarkupAddedEvent(self, obj, event):
@@ -1479,6 +1484,10 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             landmarkDescription.pop(ID,None)
         obj.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
 
+    def updatePlanesEvent(self, obj, event):
+        for planeControls in self.interface.planeControlsDictionary.values():
+            if planeControls.fidlist is obj:
+                planeControls.update()
 
     def addLandmarkToCombox(self, fidList, combobox, markupID):
         if not fidList:
