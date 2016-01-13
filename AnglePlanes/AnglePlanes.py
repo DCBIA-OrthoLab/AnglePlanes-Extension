@@ -1642,7 +1642,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         planeSource.Update()
 
         if AdaptToBoundingBoxCheckBox.isChecked():
-
+            self.interface.onComputeBox()
             clipper = vtk.vtkClipClosedSurface()
             clipper.SetClippingPlanes(planeCollection)
             clipper.SetInputData(planeSource.GetOutput())
