@@ -440,44 +440,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             positionOfNodes.append(i)
         return positionOfNodes
 
-    def enter(self):
-        if self.autoChangeLayout.isChecked():
-            lm = slicer.app.layoutManager()
-            self.currentLayout = lm.layout
-            lm.setLayout(4)  # 3D-View
-        # Show manual planes
-        for planeControls in self.planeControlsDictionary.values():
-            if planeControls.PlaneIsDefined():
-                planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
-                                          planeControls.landmark3ComboBox.currentText, planeControls.AdaptToBoundingBoxCheckBox, planeControls.slideOpacity.value, self.planeCollection)
-        self.valueComboBox()
-        self.onComputeBox()
-
-    def exit(self):
-        # Remove hidden nodes that are created just for Angle Planes
-        for x in self.colorSliceVolumes.values():
-            node = slicer.mrmlScene.GetNodeByID(x)
-            slicer.mrmlScene.RemoveNode(node)
-            node.SetHideFromEditors(False)
-        self.colorSliceVolumes = dict()
-        # Hide manual planes
-        for planeControls in self.planeControlsDictionary.values():
-            if planeControls.PlaneIsDefined():
-                planeControls.logic.planeLandmarks(planeControls.fidlist, planeControls.landmark1ComboBox.currentText, planeControls.landmark2ComboBox.currentText,
-                                          planeControls.landmark3ComboBox.currentText,planeControls.AdaptToBoundingBoxCheckBox ,planeControls.slideOpacity.value, self.planeCollection)
-        # Hide planes
-        for x in self.logic.ColorNodeCorrespondence.keys():
-            compNode = slicer.util.getNode('vtkMRMLSliceCompositeNode' + x)
-            compNode.SetLinkedControl(False)
-            slice = slicer.mrmlScene.GetNodeByID(self.logic.ColorNodeCorrespondence[x])
-            slice.SetWidgetVisible(False)
-            slice.SetSliceVisible(False)
-        # Reset layout
-        if self.autoChangeLayout.isChecked():
-            lm = slicer.app.layoutManager()
-            if lm.layout == 4:  # the user has not manually changed the layout
-                lm.setLayout(self.currentLayout)
-
     def addNewPlane(self, keyLoad=-1):
         print "------- New plane created -------"
         if keyLoad != -1:
@@ -635,12 +597,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         sampleVolumeNode.SetSaveWithScene(False)
         return sampleVolumeNode
 
-    def getFiducialIDFromName(self, node, name):
-        for i in range(0, node.GetNumberOfMarkups()):
-            if name == node.GetNthFiducialLabel(i):
-                return node.GetNthMarkupID(i)
-        return ''
-
     def onAddMidPoint(self):
         key = self.selectPlaneForMidPoint.currentText
         plane = self.planeControlsDictionary[key]
@@ -669,12 +625,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             landmarkDescription[markupID]["projection"]["isProjected"] = False
         fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
         self.logic.interface.UpdateInterface()
-
-    def fiducialInList(self, name, fidlist):
-        for i in range(0, fidlist.GetNumberOfFiducials()):
-            if name == fidlist.GetNthFiducialLabel(i):
-                return True
-        return False
 
     def onCloseScene(self, obj, event):
         self.colorSliceVolumes = dict()
@@ -736,9 +686,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         colorPlane1 = self.planeComboBox1.currentText
         colorPlane2 = self.planeComboBox2.currentText
         self.defineAngle(colorPlane1, colorPlane2)
-
-    def modify(self, obj, event):
-        self.defineAngle(self.planeComboBox1.currentText, self.planeComboBox2.currentText)
 
     def defineAngle(self, colorPlane1, colorPlane2):
         # print colorPlane1
@@ -960,12 +907,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
     def placePlaneClicked(self):
         self.anglePlanes.valueComboBox()
         self.update()
-
-    def fiducialInList(self, name, fidlist):
-        for i in range(0, fidlist.GetNumberOfFiducials()):
-            if name == fidlist.GetNthFiducialLabel(i):
-                return True
-        return False
 
     def onHideSurface(self):
         if self.PlaneIsDefined():
@@ -1448,25 +1389,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         midCoord[1] = (coord1[1] + coord2[1])/2
         midCoord[2] = (coord1[2] + coord2[2])/2
         return midCoord
-
-    def getFiducialList(self):
-
-        P = self.getFiducialListName()
-        nodes = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', P)
-        if nodes.GetNumberOfItems() == 0:
-            # The list does not exist so we create it
-
-            fidNode = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNode.SetName(P)
-            slicer.mrmlScene.AddNode(fidNode)
-
-        else:
-            # The list exists but the observers must be updated
-            fidNode = nodes.GetItemAsObject(0)
-        return fidNode
-
-    def getFiducialListName(self):
-        return "P" + str(self.id)
 
     def getMatrix(self, slice):
         self.mat = slice.GetSliceToRAS()
