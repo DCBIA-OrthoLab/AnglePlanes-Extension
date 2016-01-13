@@ -521,9 +521,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.valueComboBox()
         if self.selectPlaneForMidPoint.findText(key) > -1:
             self.selectPlaneForMidPoint.removeItem(self.selectPlaneForMidPoint.findText(key))
-        if fiducialList:
-            if planeControls.removeFiducials.checkState() == qt.Qt.Checked:
-                slicer.app.mrmlScene().RemoveNode(fiducialList)
 
     def onComputeBox(self):
         positionOfVisibleNodes = self.getPositionOfModelNodes(True)
@@ -919,11 +916,8 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
         removeButtonLayout = qt.QHBoxLayout()
         removeButtonLayout.addStretch(1)
-        removePlaneButton = qt.QPushButton("Remove")
+        removePlaneButton = qt.QPushButton("Remove Plane")
         removeButtonLayout.addWidget(removePlaneButton)
-        self.removeFiducials = qt.QCheckBox("Remove Fiducials")
-        self.removeFiducials.setChecked(True)
-        removeButtonLayout.addWidget(self.removeFiducials)
         self.layout().addRow(removeButtonLayout)
         removePlaneButton.connect('clicked(bool)', self.onRemove)
 
@@ -945,7 +939,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         return False
 
     def onRemove(self):
-        self.logic.remove()
         self.anglePlanes.RemoveManualPlane(self.id)
 
     def getFiducials(self):
