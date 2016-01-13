@@ -473,7 +473,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         planeControls = self.planeControlsDictionary[key]
         self.managePlanesFormLayout.removeWidget(planeControls)
         planeControls.deleteLater()
-        planeControls.logic.remove()
+        planeControls.remove()
         self.planeControlsDictionary.pop(key)
         self.addPlaneButton.setDisabled(False)
         if len(self.planeControlsDictionary.keys()) == 0:
@@ -778,14 +778,15 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 # P1-1, P1-2, P1-N. 
 class AnglePlanesWidgetPlaneControl(qt.QFrame):
     def __init__(self, anglePlanes, id, planeCollection, fidlist):
-        # variables
+        # ------------- variables -------------------
         self.anglePlanes = anglePlanes
-        self.logic = AnglePlanesLogic(id, anglePlanes)
+        self.logic = AnglePlanesLogic(anglePlanes)
         self.planeCollection = planeCollection
-        qt.QFrame.__init__(self)
         self.id = id
         self.fidlist = fidlist
-        #interface
+        self.actor = vtk.vtkActor()
+        # -------------- interface -------------------
+        qt.QFrame.__init__(self)
         self.setLayout(qt.QFormLayout())
         landmarkLayout = qt.QVBoxLayout()
         planeLabelLayout = qt.QHBoxLayout()
@@ -799,9 +800,9 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         addFiducialButton.setEnabled(True)
         planeLabelLayout.addWidget(addFiducialLabel)
         planeLabelLayout.addWidget(addFiducialButton)
-        numberOfNodes = len(anglePlanes.getPositionOfModelNodes(True))
         landmarkLayout.addLayout(planeLabelLayout)
         label1Layout = qt.QHBoxLayout()
+
         label1 = qt.QLabel(' L1:')
         self.landmark1ComboBox = qt.QComboBox()
         landmark1ComboBox = self.landmark1ComboBox
@@ -811,6 +812,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         label1Layout.addWidget(landmark1ComboBox)
         landmarkLayout.addLayout(label1Layout)
         label2Layout = qt.QHBoxLayout()
+
         label2 = qt.QLabel(' L2:')
         self.landmark2ComboBox = qt.QComboBox()
         landmark2ComboBox = self.landmark2ComboBox
@@ -820,6 +822,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         label2Layout.addWidget(landmark2ComboBox)
         landmarkLayout.addLayout(label2Layout)
         label3Layout = qt.QHBoxLayout()
+
         label3 = qt.QLabel(' L3:')
         self.landmark3ComboBox = qt.QComboBox()
         landmark3ComboBox = self.landmark3ComboBox
@@ -914,12 +917,12 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
                 self.logic.planeLandmarks(self.fidlist,
                                           self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
                                           self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
-                                          0, self.planeCollection)
+                                          0, self.planeCollection, self.actor)
             else:
                 self.logic.planeLandmarks(self.fidlist,
                                           self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
                                           self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
-                                          self.slideOpacity.value, self.planeCollection)
+                                          self.slideOpacity.value, self.planeCollection, self.actor)
 
     def update(self):
         self.planeCollection = self.anglePlanes.planeCollection
@@ -927,7 +930,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
             self.logic.planeLandmarks(self.fidlist,
                                       self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
                                       self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
-                                      self.slideOpacity.value, self.planeCollection)
+                                      self.slideOpacity.value, self.planeCollection, self.actor)
 
     def addLandMarkClicked(self):
         print "Add landmarks"
@@ -945,18 +948,32 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         placeModePersistence = 0
         interactionNode.SetPlaceModePersistence(placeModePersistence)
 
+    def remove(self):
+        renderer = list()
+        renderWindow = list()
+        layoutManager = slicer.app.layoutManager()
+        for i in range(0, layoutManager.threeDViewCount):
+            threeDWidget = layoutManager.threeDWidget(i)
+            threeDView = threeDWidget.threeDView()
+            renderWindow.append(threeDView.renderWindow())
+            renderers = renderWindow[i].GetRenderers()
+            renderer.append(renderers.GetFirstRenderer())
+            renderer[i].RemoveViewProp(self.actor)
+            renderWindow[i].AddRenderer(renderer[i])
+            renderer[i].Render()
+        self.actor.RemoveAllObservers()
+        self.actor = None
+
 class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     try:
         slicer.sys
     except:
         import sys
 
-    def __init__(self, id=-1, interface = None):
+    def __init__(self, interface = None):
         self.ColorNodeCorrespondence = {'Red': 'vtkMRMLSliceNodeRed',
                                         'Yellow': 'vtkMRMLSliceNodeYellow',
                                         'Green': 'vtkMRMLSliceNodeGreen'}
-        self.id = id
-        self.initialize()
         self.selectedFidList = None
         self.selectedModel = None
         self.interface = interface
@@ -986,29 +1003,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         displayNode.SetScalarVisibility(False)
         if selectedFidReflID != False:
             displayNode.SetScalarVisibility(True)
-
-    def initialize(self):
-        self.polydata = vtk.vtkPolyData()
-        self.points = vtk.vtkPoints()
-        self.planeSource = vtk.vtkPlaneSource()
-        self.mapper = vtk.vtkPolyDataMapper()
-        self.actor = vtk.vtkActor()
-
-    def remove(self):
-        renderer = list()
-        renderWindow = list()
-        layoutManager = slicer.app.layoutManager()
-        for i in range(0, layoutManager.threeDViewCount):
-            threeDWidget = layoutManager.threeDWidget(i)
-            threeDView = threeDWidget.threeDView()
-            renderWindow.append(threeDView.renderWindow())
-            renderers = renderWindow[i].GetRenderers()
-            renderer.append(renderers.GetFirstRenderer())
-            renderer[i].RemoveViewProp(self.actor)
-            renderWindow[i].AddRenderer(renderer[i])
-            renderer[i].Render()
-        self.actor.RemoveAllObservers()
-        self.actor = None
 
     def createIntermediateHardenModel(self, model):
         hardenModel = slicer.mrmlScene.GetNodesByName("SurfaceRegistration_" + model.GetName() + "_hardenCopy_" + str(
@@ -1531,7 +1525,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         return Normal
 
-    def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label, AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection):
+    def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label,
+                       AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection, actor):
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         landmark1ID = self.findIDFromLabel(fidList, Landmark1Label)
@@ -1567,7 +1562,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         a3 = coord[1]
         s3 = coord[2]
 
-        points = self.points
+        points = vtk.vtkPoints()
         if points.GetNumberOfPoints() == 0:
             points.InsertNextPoint(r1, a1, s1)
             points.InsertNextPoint(r2, a2, s2)
@@ -1578,7 +1573,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             points.SetPoint(2, r3, a3, s3)
         #print "points ", points
 
-        polydata = self.polydata
+        polydata = vtk.vtkPolyData()
         polydata.SetPoints(points)
 
         centerOfMass = vtk.vtkCenterOfMass()
@@ -1644,7 +1639,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         #print "F = ",F
 
-        planeSource = self.planeSource
+        planeSource = vtk.vtkPlaneSource()
         planeSource.SetNormal(self.N[0], self.N[1], self.N[2])
 
         planeSource.SetOrigin(D[0], D[1], D[2])
@@ -1663,14 +1658,13 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         else:
             plane = planeSource.GetOutput()
 
-        mapper = self.mapper
+        mapper = vtk.vtkPolyDataMapper()
         mapper.SetInputData(plane)
         mapper.Update()
 
-
-        self.actor.SetMapper(mapper)
-        self.actor.GetProperty().SetColor(0, 0.4, 0.8)
-        self.actor.GetProperty().SetOpacity(sliderOpacity)
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor(0, 0.4, 0.8)
+        actor.GetProperty().SetOpacity(sliderOpacity)
 
         renderer = list()
         renderWindow = list()
@@ -1681,11 +1675,10 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             renderWindow.append(threeDView.renderWindow())
             renderers = renderWindow[i].GetRenderers()
             renderer.append(renderers.GetFirstRenderer())
-            renderer[i].AddViewProp(self.actor)
+            renderer[i].AddViewProp(actor)
             renderWindow[i].AddRenderer(renderer[i])
             renderer[i].Render()
             renderWindow[i].Render()
-            print "Plane should appear"
 
     def GetConnectedVertices(self, connectedVerticesIDList, polyData, pointID):
         # Return IDs of all the vertices that compose the first neighbor.
