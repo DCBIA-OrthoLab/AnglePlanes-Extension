@@ -780,7 +780,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
     def __init__(self, anglePlanes, id, planeCollection, fidlist):
         # ------------- variables -------------------
         self.anglePlanes = anglePlanes
-        self.logic = AnglePlanesLogic(anglePlanes)
+        self.logic = anglePlanes.logic
         self.planeCollection = planeCollection
         self.id = id
         self.fidlist = fidlist
@@ -853,13 +853,13 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
         self.AdaptToBoundingBoxCheckBox = qt.QCheckBox("Adapt to bounding box")
         self.AdaptToBoundingBoxCheckBox.setChecked(False)
-        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.onHideSurface)
+        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.update)
         landmarkSliderLayout.addWidget(self.AdaptToBoundingBoxCheckBox)
         self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)',self.placePlaneClicked)
 
         self.HidePlaneCheckBox = qt.QCheckBox("Hide")
         self.HidePlaneCheckBox.setChecked(False)
-        self.HidePlaneCheckBox.connect('stateChanged(int)', self.onHideSurface)
+        self.HidePlaneCheckBox.connect('stateChanged(int)', self.update)
         landmarkSliderLayout.addWidget(self.HidePlaneCheckBox)
 
         self.layout().addRow(landmarkSliderLayout)
@@ -911,7 +911,8 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.anglePlanes.valueComboBox()
         self.update()
 
-    def onHideSurface(self):
+    def update(self):
+        self.planeCollection = self.anglePlanes.planeCollection
         if self.PlaneIsDefined():
             if self.HidePlaneCheckBox.isChecked():
                 self.logic.planeLandmarks(self.fidlist,
@@ -923,14 +924,6 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
                                           self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
                                           self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
                                           self.slideOpacity.value, self.planeCollection, self.actor)
-
-    def update(self):
-        self.planeCollection = self.anglePlanes.planeCollection
-        if self.PlaneIsDefined():
-            self.logic.planeLandmarks(self.fidlist,
-                                      self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
-                                      self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
-                                      self.slideOpacity.value, self.planeCollection, self.actor)
 
     def addLandMarkClicked(self):
         print "Add landmarks"
