@@ -607,6 +607,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         landmark2ID = self.logic.findIDFromLabel(fidList,self.landmarkComboBox2MidPoint.currentText)
         coord = self.logic.calculateMidPointCoord(fidList, landmark1ID, landmark2ID)
         fidList.AddFiducial(coord[0],coord[1],coord[2])
+        fidList.SetNthFiducialSelected(fidList.GetNumberOfMarkups() - 1, False)
         # update of the data structure
         landmarkDescription = self.logic.decodeJSON(fidList.GetAttribute("landmarkDescription"))
         numOfMarkups = fidList.GetNumberOfMarkups()
@@ -625,6 +626,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             landmarkDescription[markupID]["projection"]["isProjected"] = False
         fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
         self.logic.interface.UpdateInterface()
+        self.logic.updateLandmarkComboBox(fidList, self.landmarkComboBox, False)
 
     def onCloseScene(self, obj, event):
         self.colorSliceVolumes = dict()
@@ -699,6 +701,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 normal1 = self.logic.defineNormal(matrix1)
             else:
                 normal1 = self.planeControlsDictionary[colorPlane1].logic.N
+        else:
+            return
         # print colorPlane2
         if colorPlane2 != "None":
             if colorPlane2 in self.logic.ColorNodeCorrespondence:
@@ -710,7 +714,9 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 normal2 = self.logic.defineNormal(matrix2)
             else:
                 normal2 = self.planeControlsDictionary[colorPlane2].logic.N
-            self.logic.getAngle(normal1, normal2)
+        else:
+            return
+        self.logic.getAngle(normal1, normal2)
 
     def onSavePlanes(self):
         self.savePlanes()
@@ -723,10 +729,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         tempDictionary["Yellow"] = self.logic.getMatrix(sliceYellow).tolist()
         sliceGreen = slicer.util.getNode(self.logic.ColorNodeCorrespondence['Green'])
         tempDictionary["Green"] = self.logic.getMatrix(sliceGreen).tolist()
-        tempDictionary["customPlanes"] = {}
-        for key, plane in self.planeControlsDictionary.items():
-            tempDictionary["customPlanes"][plane.id] = plane.getFiducials()
-        print filename
         if filename is None:
             filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
         if filename != "":
@@ -736,6 +738,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def onReadPlanes(self):
         self.readPlanes()
+        self.onComputeBox()
 
     def readPlanes(self, filename=None):
         if filename is None:
@@ -761,14 +764,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             for col in range(0, len(matList)):
                 for row in range(0, len(matList[col])):
                     matNode.SetElement(col, row, matList[col][row])
-            customPlanes = tempDictionary["customPlanes"]
-            for key, fidlist in customPlanes.items():
-                self.addNewPlane(key)
-                tempkey = "Plane " + str(self.planeControlsId)
-                currentFidList = self.planeControlsDictionary[tempkey].logic.getFiducialList()
-                for i in range(0, len(fidlist)):
-                    f = fidlist[i]
-                    currentFidList.AddFiducial(f[0], f[1], f[2])
             fileObj.close()
 
 
@@ -853,7 +848,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
         self.AdaptToBoundingBoxCheckBox = qt.QCheckBox("Adapt to bounding box")
         self.AdaptToBoundingBoxCheckBox.setChecked(False)
-        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.update)
+        self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.onBBox)
         landmarkSliderLayout.addWidget(self.AdaptToBoundingBoxCheckBox)
         self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)',self.placePlaneClicked)
 
@@ -909,6 +904,10 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
 
     def placePlaneClicked(self):
         self.anglePlanes.valueComboBox()
+        self.update()
+
+    def onBBox(self):
+        self.anglePlanes.onComputeBox()
         self.update()
 
     def update(self):
@@ -1194,7 +1193,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         else:
             self.createNewDataStructure(landmarks, model, onSurface)
         #update of the landmark Combo Box
-        self.updateLandmarkComboBox(landmarks, self.interface.landmarkComboBox)
+        self.updateLandmarkComboBox(landmarks, self.interface.landmarkComboBox, False)
         #adding of listeners
         MarkupAddedEventTag = landmarks.AddObserver(landmarks.MarkupAddedEvent, self.onMarkupAddedEvent)
         landmarks.SetAttribute("MarkupAddedEventTag",self.encodeJSON({"MarkupAddedEventTag":MarkupAddedEventTag}))
@@ -1297,7 +1296,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def updateAllLandmarkComboBox(self, fidList, markupID):
         # update of the Combobox that are always updated
-        self.updateLandmarkComboBox(fidList, self.interface.landmarkComboBox)
+        self.updateLandmarkComboBox(fidList, self.interface.landmarkComboBox, False)
         for planeControls in self.interface.planeControlsDictionary.values():
             if planeControls.fidlist is fidList:
                 self.addLandmarkToCombox(fidList, planeControls.landmark1ComboBox, markupID)
@@ -1310,17 +1309,24 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             self.addLandmarkToCombox(fidList, self.interface.landmarkComboBox1MidPoint, markupID)
             self.addLandmarkToCombox(fidList, self.interface.landmarkComboBox2MidPoint, markupID)
 
-    def updateLandmarkComboBox(self, fidList, combobox):
+    def updateLandmarkComboBox(self, fidList, combobox, displayMidPoint = True):
         combobox.blockSignals(True)
+        landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
         combobox.clear()
         if not fidList:
             return
         numOfFid = fidList.GetNumberOfMarkups()
         if numOfFid > 0:
             for i in range(0, numOfFid):
-                landmarkLabel = fidList.GetNthMarkupLabel(i)
-                combobox.addItem(landmarkLabel)
-        combobox.setCurrentIndex(self.interface.landmarkComboBox.count - 1)
+                if displayMidPoint is False:
+                    ID = fidList.GetNthMarkupID(i)
+                    if not landmarkDescription[ID]["midPoint"]["isMidPoint"]:
+                        landmarkLabel = fidList.GetNthMarkupLabel(i)
+                        combobox.addItem(landmarkLabel)
+                else:
+                    landmarkLabel = fidList.GetNthMarkupLabel(i)
+                    combobox.addItem(landmarkLabel)
+        combobox.setCurrentIndex(combobox.count - 1)
         combobox.blockSignals(False)
 
     def deleteLandmark(self, fidList, label):
@@ -1642,7 +1648,6 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         planeSource.Update()
 
         if AdaptToBoundingBoxCheckBox.isChecked():
-            self.interface.onComputeBox()
             clipper = vtk.vtkClipClosedSurface()
             clipper.SetClippingPlanes(planeCollection)
             clipper.SetInputData(planeSource.GetOutput())
