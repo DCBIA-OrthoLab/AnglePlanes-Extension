@@ -1447,14 +1447,17 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         norm2_RL = sqrt(normalVect2[1] * normalVect2[1] + normalVect2[2] * normalVect2[2])
         #print "norme RL: \n", norm2_RL
 
-        if (norm1_RL == 0 or norm1_RL == 0):
+        if (norm1_RL == 0 or norm2_RL == 0):
             self.angle_degre_RL = 0
             self.angle_degre_RL_comp = 0
         else:
             scalar_product_RL = (normalVect1[1] * normalVect2[1] + normalVect1[2] * normalVect2[2])
             #print "scalar product : \n", scalar_product_RL
-
-            angleRL = acos(scalar_product_RL / (norm1_RL * norm2_RL))
+            inter = scalar_product_RL / (norm1_RL * norm2_RL)
+            if inter >= [[ 0.99999]]:
+                angleRL = 0
+            else:
+                angleRL = acos(inter)
             #print "radian angle : ", angleRL
 
             self.angle_degre_RL = angleRL * 180 / pi
@@ -1474,7 +1477,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             scalar_product_SI = (normalVect1[0] * normalVect2[0] + normalVect1[1] * normalVect2[1])
             #print "scalar product_SI : \n", scalar_product_SI
 
-            angleSI = acos(scalar_product_SI / (norm1_SI * norm2_SI))
+            inter = scalar_product_SI / (norm1_SI * norm2_SI)
+            if inter >= [[ 0.99999]]:
+                angleSI = 0
+            else:
+                angleSI = acos(inter)
             #print "radian angle : ", angleSI
 
             self.angle_degre_SI = angleSI * 180 / pi
@@ -1496,8 +1503,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             #print "scalar product_SI : \n", scalar_product_AP
 
             #print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
-
-            angleAP = acos(scalar_product_AP / (norm1_AP * norm2_AP))
+            inter = scalar_product_AP / (norm1_AP * norm2_AP)
+            if inter >= [[ 0.99999]]:
+                angleAP = 0
+            else:
+                angleAP = acos(inter)
 
             #print "radian angle : ", angleAP
 
