@@ -1,7 +1,7 @@
+import os
 from __main__ import vtk, qt, ctk, slicer
-
+import logging
 import numpy
-import copy
 import time
 from math import *
 
@@ -1795,31 +1795,38 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
 
     def runTest(self):
         # run all tests needed
+        self.delayDisplay("Clear the scene")
         self.setUp()
-        self.test_AnglePlanes()
+        self.delayDisplay("Download and load datas")
+        self.downloaddata()
+        self.delayDisplay("Starting the tests")
+        self.assertTrue(self.test_AnglePlanes())
+        self.delayDisplay('All tests passed!')
+
+    def downloaddata(self):
+        import urllib
+        downloads = (
+            ('http://slicer.kitware.com/midas3/download?items=213632', '01.vtk', slicer.util.loadModel),
+            ('http://slicer.kitware.com/midas3/download?items=213633', '02.vtk', slicer.util.loadModel),
+        )
+        for url, name, loader in downloads:
+            filePath = slicer.app.temporaryPath + '/' + name
+            print filePath
+            if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
+                logging.info('Requesting download %s from %s...\n' % (name, url))
+                urllib.urlretrieve(url, filePath)
+            if loader:
+                logging.info('Loading %s...' % (name,))
+                loader(filePath)
+
+        layoutManager = slicer.app.layoutManager()
+        threeDWidget = layoutManager.threeDWidget(0)
+        threeDView = threeDWidget.threeDView()
+        threeDView.resetFocalPoint()
 
     def test_AnglePlanes(self):
 
-        self.delayDisplay('Starting the test')
-
-        self.delayDisplay('Adding planes')
-        widget = AnglePlanesWidget()
-
-        widget.addNewPlane()
-        widget.addNewPlane()
-
-        self.delayDisplay('Adding fiducials')
-        fidlist1 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P1").GetItemAsObject(0)
-
-        fidlist1.AddFiducial(10, 10, 10)
-        fidlist1.AddFiducial(20, 20, 20)
-        fidlist1.AddFiducial(10, 20, 30)
-
-        fidlist2 = slicer.mrmlScene.GetNodesByClassByName('vtkMRMLMarkupsFiducialNode', "P2").GetItemAsObject(0)
-
-        fidlist2.AddFiducial(50, 50, 50)
-        fidlist2.AddFiducial(40, 20, 80)
-        fidlist2.AddFiducial(10, 40, 20)
+        widget = slicer.modules.AnglePlanesWidget
 
         self.delayDisplay('Saving planes')
         widget.savePlanes("test.p")
@@ -1827,18 +1834,57 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         self.delayDisplay('Loading planes')
         widget.readPlanes("test.p")
 
-        self.delayDisplay('Selecting fiducials')
-        widget.planeControlsDictionary["Plane 1"].landmark1ComboBox.setCurrentIndex(1)
-        widget.planeControlsDictionary["Plane 1"].landmark2ComboBox.setCurrentIndex(2)
-        widget.planeControlsDictionary["Plane 1"].landmark3ComboBox.setCurrentIndex(3)
+        self.delayDisplay('Adding planes')
 
-        widget.planeControlsDictionary["Plane 2"].landmark1ComboBox.setCurrentIndex(1)
-        widget.planeControlsDictionary["Plane 2"].landmark2ComboBox.setCurrentIndex(2)
-        widget.planeControlsDictionary["Plane 2"].landmark3ComboBox.setCurrentIndex(3)
+        widget.inputModelSelector.setCurrentNode(
+            slicer.mrmlScene.GetNodesByName("01").GetItemAsObject(0))
+        movingMarkupsFiducial = slicer.vtkMRMLMarkupsFiducialNode()
+        movingMarkupsFiducial.SetName("F1")
+        slicer.mrmlScene.AddNode(movingMarkupsFiducial)
+        widget.inputLandmarksSelector.setCurrentNode(movingMarkupsFiducial)
+        widget.addNewPlane()
+        plane1 = widget.planeControlsDictionary["Plane 1"]
+        movingMarkupsFiducial.AddFiducial(8.08220491, -98.03022892, 93.12060543)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        movingMarkupsFiducial.AddFiducial(-64.97482242, -26.20270453, 40.0195569)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        movingMarkupsFiducial.AddFiducial(-81.14900734, -108.26332837, 121.16330592)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        plane1.landmark1ComboBox.setCurrentIndex(0)
+        plane1.landmark2ComboBox.setCurrentIndex(1)
+        plane1.landmark3ComboBox.setCurrentIndex(2)
+
+        widget.inputModelSelector.setCurrentNode(
+            slicer.mrmlScene.GetNodesByName("02").GetItemAsObject(0))
+        movingMarkupsFiducial = slicer.vtkMRMLMarkupsFiducialNode()
+        movingMarkupsFiducial.SetName("F2")
+        slicer.mrmlScene.AddNode(movingMarkupsFiducial)
+        widget.inputLandmarksSelector.setCurrentNode(movingMarkupsFiducial)
+        widget.addNewPlane()
+        plane2 = widget.planeControlsDictionary["Plane 2"]
+        movingMarkupsFiducial.AddFiducial(-39.70435272, -97.08191652, 91.88711809)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        movingMarkupsFiducial.AddFiducial(-96.02709079, -18.26063616, 21.47774342)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        movingMarkupsFiducial.AddFiducial(-127.93278815, -106.45001448, 92.35628815)
+        widget.logic.onPointModifiedEvent(movingMarkupsFiducial,None)
+        plane2.landmark1ComboBox.setCurrentIndex(0)
+        plane2.landmark2ComboBox.setCurrentIndex(1)
+        plane2.landmark3ComboBox.setCurrentIndex(2)
+
+        self.delayDisplay('Hide Planes')
+        plane1.HidePlaneCheckBox.setChecked(True)
+        plane2.HidePlaneCheckBox.setChecked(True)
+
+        self.delayDisplay('Adapt on bounding box')
+        plane1.HidePlaneCheckBox.setChecked(False)
+        plane2.HidePlaneCheckBox.setChecked(False)
+        plane1.AdaptToBoundingBoxCheckBox.setChecked(True)
+        plane2.AdaptToBoundingBoxCheckBox.setChecked(True)
 
         self.delayDisplay('Selecting planes')
-        widget.planeComboBox1.setCurrentIndex(5)
-        widget.planeComboBox2.setCurrentIndex(6)
+        widget.planeComboBox1.setCurrentIndex(4)
+        widget.planeComboBox2.setCurrentIndex(4)
 
         self.delayDisplay('Calculating angle')
         widget.angleValue()
@@ -1849,13 +1895,10 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         if test:
 
             print "", "Angle", "Complementary"
-            print "R-L-View", self.logic.angle_degre_RL, self.logic.angle_degre_RL_comp
-            print "S-I-View", self.logic.angle_degre_SI, self.logic.angle_degre_SI_comp
-            print "A-P-View", self.logic.angle_degre_AP, self.logic.angle_degre_AP_comp
+            print "R-L-View", widget.logic.angle_degre_RL, widget.logic.angle_degre_RL_comp
+            print "S-I-View", widget.logic.angle_degre_SI, widget.logic.angle_degre_SI_comp
+            print "A-P-View", widget.logic.angle_degre_AP, widget.logic.angle_degre_AP_comp
             self.delayDisplay('Test Failure!')
 
         else:
             self.delayDisplay('Test passed!')
-
-        widget.parent.close()
-
