@@ -690,6 +690,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.defineAngle(colorPlane1, colorPlane2)
 
     def defineAngle(self, colorPlane1, colorPlane2):
+        print "--- defineAngle ---"
         # print colorPlane1
         if colorPlane1 != "None":
             if colorPlane1 in self.logic.ColorNodeCorrespondence:
@@ -700,7 +701,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 matrix1 = self.logic.getMatrix(slice1)
                 normal1 = self.logic.defineNormal(matrix1)
             else:
-                normal1 = self.planeControlsDictionary[colorPlane1].logic.N
+                normal1 = self.planeControlsDictionary[colorPlane1].normal
         else:
             return
         # print colorPlane2
@@ -713,9 +714,13 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 matrix2 = self.logic.getMatrix(slice2)
                 normal2 = self.logic.defineNormal(matrix2)
             else:
-                normal2 = self.planeControlsDictionary[colorPlane2].logic.N
+                normal2 = self.planeControlsDictionary[colorPlane2].normal
         else:
             return
+        print "normal 1"
+        print normal1
+        print "normal 2"
+        print normal2
         self.logic.getAngle(normal1, normal2)
 
     def onSavePlanes(self):
@@ -780,6 +785,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.id = id
         self.fidlist = fidlist
         self.actor = vtk.vtkActor()
+        self.normal = None
         # -------------- interface -------------------
         qt.QFrame.__init__(self)
         self.setLayout(qt.QFormLayout())
@@ -914,14 +920,16 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.planeCollection = self.anglePlanes.planeCollection
         if self.PlaneIsDefined():
             if self.HidePlaneCheckBox.isChecked():
-                self.logic.planeLandmarks(self.fidlist,
+                self.normal = self.logic.planeLandmarks(self.fidlist,
                                           self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
-                                          self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
+                                          self.landmark3ComboBox.currentText, self.normal,
+                                          self.AdaptToBoundingBoxCheckBox,
                                           0, self.planeCollection, self.actor)
             else:
-                self.logic.planeLandmarks(self.fidlist,
+                self.normal = self.logic.planeLandmarks(self.fidlist,
                                           self.landmark1ComboBox.currentText, self.landmark2ComboBox.currentText,
-                                          self.landmark3ComboBox.currentText, self.AdaptToBoundingBoxCheckBox,
+                                          self.landmark3ComboBox.currentText, self.normal,
+                                          self.AdaptToBoundingBoxCheckBox,
                                           self.slideOpacity.value, self.planeCollection, self.actor)
 
     def addLandMarkClicked(self):
@@ -1384,8 +1392,9 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         return midCoord
 
     def getMatrix(self, slice):
+        print "--- get Matrix ---"
         self.mat = slice.GetSliceToRAS()
-        # print self.mat
+        print self.mat
         # ---------------------- RED SLICE -----------------------#
         # Matrix with the elements of SliceToRAS
         m = numpy.matrix([[self.mat.GetElement(0, 0), self.mat.GetElement(0, 1), self.mat.GetElement(0, 2),
@@ -1396,10 +1405,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                            self.mat.GetElement(2, 3)],
                           [self.mat.GetElement(3, 0), self.mat.GetElement(3, 1), self.mat.GetElement(3, 2),
                            self.mat.GetElement(3, 3)]])
+        print m
         return m
 
     def defineNormal(self, matrix):
-
+        print "--- defineNormal ---"
         # Normal vector to the Red slice:
         n_vector = numpy.matrix([[0], [0], [1], [1]])
 
@@ -1407,7 +1417,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         A = numpy.matrix([[0], [0], [0], [1]])
 
         normalVector = matrix * n_vector
-        # print "n : \n", normalVector
+        print "n : \n", normalVector
         A = matrix * A
 
         normalVector1 = normalVector
@@ -1416,126 +1426,128 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         normalVector1[1] = normalVector[1] - A[1]
         normalVector1[2] = normalVector[2] - A[2]
 
-        #print normalVector1
+        print normalVector1
 
         return normalVector1
 
     def getAngle(self, normalVect1, normalVect2):
-
+        print "--- getAngle ---"
         norm1 = sqrt(
             normalVect1[0] * normalVect1[0] + normalVect1[1] * normalVect1[1] + normalVect1[2] * normalVect1[2])
-        # print "norme 1: \n", norm1
+        print "norme 1: \n", norm1
         norm2 = sqrt(
             normalVect2[0] * normalVect2[0] + normalVect2[1] * normalVect2[1] + normalVect2[2] * normalVect2[2])
-        #print "norme 2: \n", norm2
+        print "norme 2: \n", norm2
 
 
         scalar_product = (
             normalVect1[0] * normalVect2[0] + normalVect1[1] * normalVect2[1] + normalVect1[2] * normalVect2[2])
-        #print "scalar product : \n", scalar_product
+        print "scalar product : \n", scalar_product
 
         angle = acos(scalar_product / (norm1 * norm2))
 
-        #print "radian angle : ", angle
+        print "radian angle : ", angle
 
         angle_degree = angle * 180 / pi
-        #print "Angle in degree", angle_degree
+        print "Angle in degree", angle_degree
 
 
         norm1_RL = sqrt(normalVect1[1] * normalVect1[1] + normalVect1[2] * normalVect1[2])
-        #print "norme RL: \n", norm1_RL
+        print "norme RL: \n", norm1_RL
         norm2_RL = sqrt(normalVect2[1] * normalVect2[1] + normalVect2[2] * normalVect2[2])
-        #print "norme RL: \n", norm2_RL
+        print "norme RL: \n", norm2_RL
 
         if (norm1_RL == 0 or norm2_RL == 0):
             self.angle_degre_RL = 0
             self.angle_degre_RL_comp = 0
         else:
             scalar_product_RL = (normalVect1[1] * normalVect2[1] + normalVect1[2] * normalVect2[2])
-            #print "scalar product : \n", scalar_product_RL
+            print "scalar product : \n", scalar_product_RL
             inter = scalar_product_RL / (norm1_RL * norm2_RL)
             if inter >= [[ 0.99999]]:
                 angleRL = 0
             else:
                 angleRL = acos(inter)
-            #print "radian angle : ", angleRL
+            print "radian angle : ", angleRL
 
             self.angle_degre_RL = angleRL * 180 / pi
             self.angle_degre_RL = round(self.angle_degre_RL, 2)
-            #print self.angle_degre_RL
+            print self.angle_degre_RL
             self.angle_degre_RL_comp = 180 - self.angle_degre_RL
 
         norm1_SI = sqrt(normalVect1[0] * normalVect1[0] + normalVect1[1] * normalVect1[1])
-        #print "norme1_SI : \n", norm1_SI
+        print "norme1_SI : \n", norm1_SI
         norm2_SI = sqrt(normalVect2[0] * normalVect2[0] + normalVect2[1] * normalVect2[1])
-        #print "norme2_SI : \n", norm2_SI
+        print "norme2_SI : \n", norm2_SI
 
         if (norm1_SI == 0 or norm2_SI == 0):
             self.angle_degre_SI = 0
             self.angle_degre_SI_comp = 0
         else:
             scalar_product_SI = (normalVect1[0] * normalVect2[0] + normalVect1[1] * normalVect2[1])
-            #print "scalar product_SI : \n", scalar_product_SI
+            print "scalar product_SI : \n", scalar_product_SI
 
             inter = scalar_product_SI / (norm1_SI * norm2_SI)
             if inter >= [[ 0.99999]]:
                 angleSI = 0
             else:
                 angleSI = acos(inter)
-            #print "radian angle : ", angleSI
+            print "radian angle : ", angleSI
 
             self.angle_degre_SI = angleSI * 180 / pi
             self.angle_degre_SI = round(self.angle_degre_SI, 2)
-            #print self.angle_degre_SI
+            print self.angle_degre_SI
             self.angle_degre_SI_comp = 180 - self.angle_degre_SI
-            #print self.angle_degre_SI_comp
+            print self.angle_degre_SI_comp
 
         norm1_AP = sqrt(normalVect1[0] * normalVect1[0] + normalVect1[2] * normalVect1[2])
-        #print "norme1_SI : \n", norm1_AP
+        print "norme1_SI : \n", norm1_AP
         norm2_AP = sqrt(normalVect2[0] * normalVect2[0] + normalVect2[2] * normalVect2[2])
-        #print "norme2_SI : \n", norm2_AP
+        print "norme2_SI : \n", norm2_AP
 
         if (norm1_AP == 0 or norm2_AP == 0):
             self.angle_degre_AP = 0
             self.angle_degre_AP_comp = 0
         else:
             scalar_product_AP = (normalVect1[0] * normalVect2[0] + normalVect1[2] * normalVect2[2])
-            #print "scalar product_SI : \n", scalar_product_AP
+            print "scalar product_SI : \n", scalar_product_AP
 
-            #print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
+            print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
             inter = scalar_product_AP / (norm1_AP * norm2_AP)
             if inter >= [[ 0.99999]]:
                 angleAP = 0
             else:
                 angleAP = acos(inter)
 
-            #print "radian angle : ", angleAP
+            print "radian angle : ", angleAP
 
             self.angle_degre_AP = angleAP * 180 / pi
             self.angle_degre_AP = round(self.angle_degre_AP, 2)
-            #print self.angle_degre_AP
+            print self.angle_degre_AP
             self.angle_degre_AP_comp = 180 - self.angle_degre_AP
 
     def normalLandmarks(self, GA, GB):
+        print "--- normalLandmarks ---"
         Vn = numpy.matrix([[0], [0], [0]])
         Vn[0] = GA[1] * GB[2] - GA[2] * GB[1]
         Vn[1] = GA[2] * GB[0] - GA[0] * GB[2]
         Vn[2] = GA[0] * GB[1] - GA[1] * GB[0]
 
-        #print "Vn = ",Vn
+        print "Vn = ",Vn
 
         norm_Vn = sqrt(Vn[0] * Vn[0] + Vn[1] * Vn[1] + Vn[2] * Vn[2])
 
-        #print "norm_Vn = ",norm_Vn
+        print "norm_Vn = ",norm_Vn
 
         Normal = Vn / norm_Vn
 
-        #print "N = ",Normal
+        print "N = ",Normal
 
         return Normal
 
-    def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label,
+    def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label, Normal,
                        AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection, actor):
+        print "--- planeLandmarks ---"
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         landmark1ID = self.findIDFromLabel(fidList, Landmark1Label)
@@ -1554,19 +1566,19 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         coord = numpy.zeros(3)
         landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
         fidList.GetNthFiducialPosition(landmark1Index, coord)
-        #print "Landmark1Value: ", coord
+        print "Landmark1Value: ", coord
         r1 = coord[0]
         a1 = coord[1]
         s1 = coord[2]
         landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
         fidList.GetNthFiducialPosition(landmark2Index, coord)
-        #print "Landmark2Value: ", coord
+        print "Landmark2Value: ", coord
         r2 = coord[0]
         a2 = coord[1]
         s2 = coord[2]
         landmark3Index = fidList.GetMarkupIndexByID(landmark3ID)
         fidList.GetNthFiducialPosition(landmark3Index, coord)
-        #print "Landmark3Value: ", coord
+        print "Landmark3Value: ", coord
         r3 = coord[0]
         a3 = coord[1]
         s3 = coord[2]
@@ -1580,7 +1592,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             points.SetPoint(0, r1, a1, s1)
             points.SetPoint(1, r2, a2, s2)
             points.SetPoint(2, r3, a3, s3)
-        #print "points ", points
+        print "points ", points
 
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(points)
@@ -1592,7 +1604,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         G = centerOfMass.GetCenter()
 
-        #print "Center of mass = ",G
+        print "Center of mass = ",G
 
         A = (r1, a1, s1)
         B = (r2, a2, s2)
@@ -1604,7 +1616,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GA[1] = A[1] - G[1]
         GA[2] = A[2] - G[2]
 
-        #print "GA = ", GA
+        print "GA = ", GA
 
         # Vector BG
         GB = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1612,7 +1624,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GB[1] = B[1] - G[1]
         GB[2] = B[2] - G[2]
 
-        #print "GB = ", GB
+        print "GB = ", GB
 
         # Vector CG
         GC = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1620,9 +1632,9 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GC[1] = C[1] - G[1]
         GC[2] = C[2] - G[2]
 
-        #print "GC = ", GC
+        print "GC = ", GC
 
-        self.N = self.normalLandmarks(GA, GB)
+        normal = self.normalLandmarks(GA, GB)
 
         D = numpy.matrix([[0.0], [0.0], [0.0]])
         E = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1632,24 +1644,24 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         D[1] = slider * GA[1] + G[1]
         D[2] = slider * GA[2] + G[2]
 
-        #print "Slider value : ", slider
+        print "Slider value : ", slider
 
-        #print "D = ",D
+        print "D = ",D
 
         E[0] = slider * GB[0] + G[0]
         E[1] = slider * GB[1] + G[1]
         E[2] = slider * GB[2] + G[2]
 
-        #print "E = ",E
+        print "E = ",E
 
         F[0] = slider * GC[0] + G[0]
         F[1] = slider * GC[1] + G[1]
         F[2] = slider * GC[2] + G[2]
 
-        #print "F = ",F
+        print "F = ",F
 
         planeSource = vtk.vtkPlaneSource()
-        planeSource.SetNormal(self.N[0], self.N[1], self.N[2])
+        planeSource.SetNormal(normal[0], normal[1], normal[2])
 
         planeSource.SetOrigin(D[0], D[1], D[2])
         planeSource.SetPoint1(E[0], E[1], E[2])
@@ -1687,6 +1699,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             renderWindow[i].AddRenderer(renderer[i])
             renderer[i].Render()
             renderWindow[i].Render()
+        return normal
 
     def GetConnectedVertices(self, connectedVerticesIDList, polyData, pointID):
         # Return IDs of all the vertices that compose the first neighbor.
@@ -1889,7 +1902,9 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         self.delayDisplay('Calculating angle')
         widget.angleValue()
 
-        test = widget.logic.angle_degre_RL != 59.06 or widget.logic.angle_degre_RL_comp != 120.94 or widget.logic.angle_degre_SI != 12.53 or widget.logic.angle_degre_SI_comp != 167.47 or widget.logic.angle_degre_AP != 82.56 or widget.logic.angle_degre_AP_comp != 97.44
+        test = widget.logic.angle_degre_RL != 03.55 or widget.logic.angle_degre_RL_comp != 176.45 or\
+               widget.logic.angle_degre_SI != 17.91 or widget.logic.angle_degre_SI_comp != 162.09 or\
+               widget.logic.angle_degre_AP != 16.34 or widget.logic.angle_degre_AP_comp != 163.66
 
         self.delayDisplay('Testing angles')
         if test:
@@ -1899,6 +1914,8 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
             print "S-I-View", widget.logic.angle_degre_SI, widget.logic.angle_degre_SI_comp
             print "A-P-View", widget.logic.angle_degre_AP, widget.logic.angle_degre_AP_comp
             self.delayDisplay('Test Failure!')
+            return False
 
         else:
             self.delayDisplay('Test passed!')
+            return True
