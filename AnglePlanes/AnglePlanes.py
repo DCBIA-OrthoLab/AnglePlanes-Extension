@@ -90,251 +90,86 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.ignoredNodeNames = ('Red Volume Slice', 'Yellow Volume Slice', 'Green Volume Slice')
         self.colorSliceVolumes = dict()
         self.n_vector = numpy.matrix([[0], [0], [1], [1]])
-
         self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
-        # Definition of the 2 planes
 
-        # Collapsible button -- Scene Description
-        self.loadCollapsibleButton = ctk.ctkCollapsibleButton()
-        self.loadCollapsibleButton.text = "Scene"
-        self.layout.addWidget(self.loadCollapsibleButton)
+        # UI setup
+        loader = qt.QUiLoader()
+        moduleName = 'AnglePlanes'
+        scriptedModulesPath = eval('slicer.modules.%s.path' % moduleName.lower())
+        scriptedModulesPath = os.path.dirname(scriptedModulesPath)
+        path = os.path.join(scriptedModulesPath, 'Resources', 'UI', '%s.ui' %moduleName)
 
-        # Layout within the laplace collapsible button
-        self.loadFormLayout = qt.QFormLayout(self.loadCollapsibleButton)
+        qfile = qt.QFile(path)
+        qfile.open(qt.QFile.ReadOnly)
+        widget = loader.load(qfile, self.parent)
+        self.layout = self.parent.layout()
+        self.widget = widget
+        self.layout.addWidget(widget)
 
-        #--------------------------- List of Models --------------------------#
-
-        treeView = slicer.qMRMLTreeView()
+        #--------------------------- Scene --------------------------#
+        treeView = self.logic.get("treeView")
         treeView.setMRMLScene(slicer.app.mrmlScene())
-        treeView.setSceneModelType('Displayable')
         treeView.sceneModel().setHorizontalHeaderLabels(["Models"])
         treeView.sortFilterProxyModel().nodeTypes = ['vtkMRMLModelNode']
-        header = treeView.header()
-        header.setResizeMode(0, qt.QHeaderView.Stretch)
-        header.setVisible(True)
-        self.loadFormLayout.addWidget(treeView)
-
-        self.autoChangeLayout = qt.QCheckBox()
-        self.autoChangeLayout.setCheckState(qt.Qt.Checked)
-        self.autoChangeLayout.setTristate(False)
-        self.autoChangeLayout.setText("Automatically change layout to 3D only")
-        self.loadFormLayout.addWidget(self.autoChangeLayout)
-        # Add vertical spacer
-        self.layout.addStretch(1)
-        #------------------------ Compute Bounding Box ----------------------#
-        buttonFrameBox = qt.QFrame(self.parent)
-        buttonFrameBox.setLayout(qt.QHBoxLayout())
-        self.loadFormLayout.addWidget(buttonFrameBox)
-
-        self.computeBox = qt.QPushButton("Compute Bounding Box around all models")
-        buttonFrameBox.layout().addWidget(self.computeBox)
-        self.computeBox.connect('clicked()', self.onComputeBox)
-        self.computeBox.setDisabled(True)
-        self.CollapsibleButton = ctk.ctkCollapsibleButton()
-        self.CollapsibleButton.text = "Manage planes"
-        self.layout.addWidget(self.CollapsibleButton)
-        self.managePlanesFormLayout = qt.QFormLayout(self.CollapsibleButton)
-        self.CollapsibleButton.checked = True
-
-        # Add planes and manage landmark addition to each plane
-
-        # -------------------------------Selection of a model for new plan---------------------------------
-        # Input model Selectors
-        inputModelLabel = qt.QLabel("Model for projection")
-        self.inputModelSelector = slicer.qMRMLNodeComboBox()
-        self.inputModelSelector.objectName = 'inputFixedModelNodeSelector'
-        self.inputModelSelector.nodeTypes = ['vtkMRMLModelNode']
-        self.inputModelSelector.selectNodeUponCreation = False
-        self.inputModelSelector.addEnabled = False
-        self.inputModelSelector.removeEnabled = False
-        self.inputModelSelector.noneEnabled = True
-        self.inputModelSelector.showHidden = False
-        self.inputModelSelector.showChildNodeTypes = False
+        treeView.header().setVisible(False)
+        self.autoChangeLayout = self.logic.get("autoChangeLayout")
+        self.computeBox = self.logic.get("computeBox")
+        # -------------------------------Manage planes---------------------------------
+        self.CollapsibleButton = self.logic.get("CollapsibleButton")
+        self.managePlanesFormLayout = self.logic.get("managePlanesFormLayout")
+        self.inputModelSelector = self.logic.get("inputModelSelector")
         self.inputModelSelector.setMRMLScene(slicer.mrmlScene)
-        # Input landmark Selector
-        inputLandmarksLabel = qt.QLabel("Connected landmarks")
-        self.inputLandmarksSelector = slicer.qMRMLNodeComboBox()
-        self.inputLandmarksSelector.objectName = 'inputMovingFiducialsNodeSelector'
-        self.inputLandmarksSelector.nodeTypes = ['vtkMRMLMarkupsFiducialNode']
-        self.inputLandmarksSelector.selectNodeUponCreation = True
-        self.inputLandmarksSelector.addEnabled = True
-        self.inputLandmarksSelector.removeEnabled = False
-        self.inputLandmarksSelector.renameEnabled = True
-        self.inputLandmarksSelector.noneEnabled = True
-        self.inputLandmarksSelector.showHidden = False
-        self.inputLandmarksSelector.showChildNodeTypes = True
+        self.inputLandmarksSelector = self.logic.get("inputLandmarksSelector")
         self.inputLandmarksSelector.setMRMLScene(slicer.mrmlScene)
-        self.inputLandmarksSelector.setEnabled(False)
-        # input landmarks Frames
-        inputModelSelectorFrame = qt.QFrame(self.parent)
-        inputModelSelectorFrame.setLayout(qt.QHBoxLayout())
-        inputModelSelectorFrame.layout().addWidget(inputModelLabel)
-        inputModelSelectorFrame.layout().addWidget(self.inputModelSelector)
-        # Load on the surface
-        self.loadLandmarksOnSurfacCheckBox = qt.QCheckBox("On Surface")
-        self.loadLandmarksOnSurfacCheckBox.setChecked(True)
-        # Layouts
-        InputModelLayout = qt.QHBoxLayout()
-        InputModelLayout.addWidget(inputModelSelectorFrame)
-        # input landmarks Frames
-        inputLandmarksSelectorFrame = qt.QFrame(self.parent)
-        inputLandmarksSelectorFrame.setLayout(qt.QHBoxLayout())
-        inputLandmarksSelectorFrame.layout().addWidget(inputLandmarksLabel)
-        inputLandmarksSelectorFrame.layout().addWidget(self.inputLandmarksSelector)
-        # Layouts
-        InputLandmarkLayout = qt.QHBoxLayout()
-        InputLandmarkLayout.addWidget(inputLandmarksSelectorFrame)
-        InputLandmarkLayout.addWidget(self.loadLandmarksOnSurfacCheckBox)
-        # Add plan Button
-        self.addPlaneButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsAddFiducial.png"), " ")
-        self.addPlaneButton.connect('clicked()', self.addNewPlane)
-        self.addPlaneButton.setEnabled(False)
-        # input GroupBox
-        InputLayout = qt.QVBoxLayout()
-        InputLayout.addLayout(InputModelLayout)
-        InputLayout.addLayout(InputLandmarkLayout)
-        InputLayout.addWidget(self.addPlaneButton)
-        self.modelBox = qt.QGroupBox("Add new plan")
-        self.modelBox.setLayout(InputLayout)
-        self.managePlanesFormLayout.addRow(self.modelBox)
-        # Select a landmark
-        self.landmarkComboBox = qt.QComboBox()
-        self.landmarkComboBox.connect('currentIndexChanged(QString)', self.UpdateInterface)
-        BoxLayout = qt.QFormLayout()
-        BoxLayout.addRow("Select a Landmark:", self.landmarkComboBox)
-        self.surfaceDeplacementCheckBox = qt.QCheckBox(" deplacement on surface ")
-        self.surfaceDeplacementCheckBox.setChecked(True)
-        self.surfaceDeplacementCheckBox.connect('stateChanged(int)', self.onSurfaceDeplacementStateChanged)
-        scaleAndAddLandmarkLayout = qt.QHBoxLayout()
-        scaleAndAddLandmarkLayout.addLayout(BoxLayout)
-        scaleAndAddLandmarkLayout.addWidget(self.surfaceDeplacementCheckBox)
-        self.modelBox2 = qt.QGroupBox("Landmark modification")
-        self.modelBox2.setLayout(scaleAndAddLandmarkLayout)
-        self.managePlanesFormLayout.addRow(self.modelBox2)
-
-        #        ----------------- Compute Mid Point -------------   
-        self.midPointGroupBox = ctk.ctkCollapsibleButton()
-        landmark1Layout = qt.QFormLayout()
-        self.midPointGroupBox.setText('Define middle point between two landmarks')
-        self.midPointGroupBox.collapsed = True
-        self.parent.layout().addWidget(self.midPointGroupBox)
-        self.selectPlaneForMidPoint = qt.QComboBox()
-        self.selectPlaneForMidPoint.connect('currentIndexChanged(int)', self.onChangeMiddlePointFiducialNode)
-        landmark1Layout.addRow('Choose plane: ', self.selectPlaneForMidPoint)
-        self.landmarkComboBox1MidPoint = qt.QComboBox()
-        self.landmarkComboBox2MidPoint = qt.QComboBox()
-        landmark1Layout.addRow('Landmark A: ', self.landmarkComboBox1MidPoint)
-        landmark1Layout.addRow('Landmark B: ', self.landmarkComboBox2MidPoint)
-        self.midPointOnSurfaceCheckBox = qt.QCheckBox('On Surface')
-        self.defineMiddlePointButton = qt.QPushButton(' Add middle point ')
-        self.defineMiddlePointButton.setSizePolicy(3,1)
-        middlePointLayout = qt.QHBoxLayout()
-        middlePointLayout.addWidget(self.defineMiddlePointButton)
-        middlePointLayout.addWidget(self.midPointOnSurfaceCheckBox)
-        landmark1Layout.addRow(middlePointLayout)
-        self.midPointGroupBox.setLayout(landmark1Layout)
-        self.midPointGroupBox.setDisabled(True)
-        self.defineMiddlePointButton.connect('clicked()', self.onAddMidPoint)
-
+        self.loadLandmarksOnSurfacCheckBox = self.logic.get("loadLandmarksOnSurfacCheckBox")
+        self.addPlaneButton = self.logic.get("addPlaneButton")
+        self.landmarkComboBox = self.logic.get("landmarkComboBox")
+        self.surfaceDeplacementCheckBox = self.logic.get("surfaceDeplacementCheckBox")
+        # ----------------- Compute Mid Point -------------
+        self.midPointGroupBox = self.logic.get("midPointGroupBox")
+        self.selectPlaneForMidPoint = self.logic.get("selectPlaneForMidPoint")
+        self.landmarkComboBox1MidPoint = self.logic.get("landmarkComboBox1MidPoint")
+        self.landmarkComboBox2MidPoint = self.logic.get("landmarkComboBox2MidPoint")
+        self.midPointOnSurfaceCheckBox = self.logic.get("midPointOnSurfaceCheckBox")
+        self.defineMiddlePointButton = self.logic.get("defineMiddlePointButton")
+        # -------- Choose planes ------------
+        self.CollapsibleButtonPlane = self.logic.get("CollapsibleButtonPlane")
+        self.planeComboBox1 = self.logic.get("planeComboBox1")
+        self.planeComboBox2 = self.logic.get("planeComboBox2")
         # -------- Calculate angles between planes ------------
-
-        self.CollapsibleButtonPlane = ctk.ctkCollapsibleButton()
-        self.CollapsibleButtonPlane.text = "Choose planes"
-        self.layout.addWidget(self.CollapsibleButtonPlane)
-        sampleFormLayoutPlane = qt.QFormLayout(self.CollapsibleButtonPlane)
-
-        self.planeComboBox1 = qt.QComboBox()
-        self.fillColorsComboBox(self.planeComboBox1)
-        sampleFormLayoutPlane.addRow("Select plane 1: ", self.planeComboBox1)
-
-        self.planeComboBox2 = qt.QComboBox()
-        self.fillColorsComboBox(self.planeComboBox2)
-        sampleFormLayoutPlane.addRow("Select plane 2: ", self.planeComboBox2)
-
-        self.CollapsibleButton2 = ctk.ctkCollapsibleButton()
-        self.CollapsibleButton2.text = "Results"
-        self.layout.addWidget(self.CollapsibleButton2)
-        sampleFormLayout2 = qt.QVBoxLayout()
-        self.CollapsibleButton2.setLayout(sampleFormLayout2)
-
-        self.results = qt.QPushButton("Results")
-        self.results.connect('clicked()', self.angleValue)
-        sampleFormLayout2.addWidget(self.results)
-
-        label_RL = qt.QLabel("R-L View")
+        self.CollapsibleButton2 = self.logic.get("CollapsibleButton2")
+        self.results = self.logic.get("results")
+        self.tableResult = self.logic.get("tableResult")
         self.getAngle_RL = qt.QLabel("0")
-
-        label_SI = qt.QLabel("S-I View")
         self.getAngle_SI = qt.QLabel("0")
-
-        label_AP = qt.QLabel("A-P View")
         self.getAngle_AP = qt.QLabel("0")
-
         self.getAngle_RL_comp = qt.QLabel("0")
         self.getAngle_SI_comp = qt.QLabel("0")
         self.getAngle_AP_comp = qt.QLabel("0")
-
-        tableResult = qt.QTableWidget(3, 3)
-        tableResult.setColumnCount(3)
-        tableResult.setHorizontalHeaderLabels([' View ', 'Angle', 'Complementary angle'])
-        tableResult.setColumnWidth(0, 80)
-        tableResult.setColumnWidth(1, 80)
-        tableResult.setColumnWidth(2, 180)
-
-        tableResult.setRowCount(1)
-        tableResult.setCellWidget(0, 0, label_RL)
-        tableResult.setCellWidget(0, 1, self.getAngle_RL)
-        tableResult.setCellWidget(0, 2, self.getAngle_RL_comp)
-
-        tableResult.setRowCount(2)
-        tableResult.setCellWidget(1, 0, label_SI)
-        tableResult.setCellWidget(1, 1, self.getAngle_SI)
-        tableResult.setCellWidget(1, 2, self.getAngle_SI_comp)
-
-        tableResult.setRowCount(3)
-        tableResult.setCellWidget(2, 0, label_AP)
-        tableResult.setCellWidget(2, 1, self.getAngle_AP)
-        tableResult.setCellWidget(2, 2, self.getAngle_AP_comp)
-
-
-        # Add vertical spacer
-        self.layout.addStretch(1)
-
-        sampleFormLayout2.addWidget(tableResult)
-
-        self.CollapsibleButton3 = ctk.ctkCollapsibleButton()
-        self.CollapsibleButton3.text = "Save"
-        self.layout.addWidget(self.CollapsibleButton3)
-        sampleFormLayout3 = qt.QFormLayout(self.CollapsibleButton3)
-        self.CollapsibleButton3.checked = False
-
-        buttonFrame = qt.QFrame(self.parent)
-        buttonFrame.setLayout(qt.QVBoxLayout())
-        sampleFormLayout3.addWidget(buttonFrame)
-
-        #-------------------------------- PLANES --------------------------------#
-        save_plane = qt.QLabel("Save the planes you create as a txt file.")
-        buttonFrame.layout().addWidget(save_plane)
-        save = qt.QPushButton("Save plane")
-        buttonFrame.layout().addWidget(save)
-
-        # load_plane = qt.QLabel("Load the file with the plane you saved.")
-        # buttonFrame.layout().addWidget(load_plane)
-        read = qt.QPushButton("Load plane")
-        buttonFrame.layout().addWidget(read)
-
+        self.tableResult.setCellWidget(0, 0, self.getAngle_RL)
+        self.tableResult.setCellWidget(0, 1, self.getAngle_RL_comp)
+        self.tableResult.setCellWidget(1, 0, self.getAngle_SI)
+        self.tableResult.setCellWidget(1, 1, self.getAngle_SI_comp)
+        self.tableResult.setCellWidget(2, 0, self.getAngle_AP)
+        self.tableResult.setCellWidget(2, 1, self.getAngle_AP_comp)
+        # -------------------------------- PLANES --------------------------------#
+        self.CollapsibleButton3 = self.logic.get("CollapsibleButton3")
+        self.save = self.logic.get("save")
+        self.read = self.logic.get("read")
         #-------------------------------- CONNECTIONS --------------------------------#
+        self.computeBox.connect('clicked()', self.onComputeBox)
         self.inputModelSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onModelChanged)
         self.inputLandmarksSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.onLandmarksChanged)
         self.planeComboBox1.connect('currentIndexChanged(QString)', self.valueComboBox)
         self.planeComboBox2.connect('currentIndexChanged(QString)', self.valueComboBox)
-        # Setting combo boxes at different values/index otherwise infinite loop
-        self.planeComboBox1.setCurrentIndex(0)
-        self.planeComboBox2.setCurrentIndex(0)
-        self.valueComboBox()
-
-        save.connect('clicked(bool)', self.onSavePlanes)
-        read.connect('clicked(bool)', self.onReadPlanes)
+        self.addPlaneButton.connect('clicked()', self.addNewPlane)
+        self.landmarkComboBox.connect('currentIndexChanged(QString)', self.UpdateInterface)
+        self.surfaceDeplacementCheckBox.connect('stateChanged(int)', self.onSurfaceDeplacementStateChanged)
+        self.selectPlaneForMidPoint.connect('currentIndexChanged(int)', self.onChangeMiddlePointFiducialNode)
+        self.defineMiddlePointButton.connect('clicked()', self.onAddMidPoint)
+        self.results.connect('clicked()', self.angleValue)
+        self.save.connect('clicked(bool)', self.onSavePlanes)
+        self.read.connect('clicked(bool)', self.onReadPlanes)
 
         slicer.mrmlScene.AddObserver(slicer.mrmlScene.EndCloseEvent, self.onCloseScene)
 
@@ -342,6 +177,13 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             modelnode = slicer.mrmlScene.GetNthNodeByClass(i, "vtkMRMLModelNode")
             modelnode.AddObserver(modelnode.DisplayModifiedEvent, self.onChangeModelDisplay)
         ModelAddedClass(self)
+
+        # ------------------------------ INITIALISATION ---------------------------------
+        self.fillColorsComboBox(self.planeComboBox1)
+        self.fillColorsComboBox(self.planeComboBox2)
+        self.planeComboBox1.setCurrentIndex(0)
+        self.planeComboBox2.setCurrentIndex(0)
+        self.valueComboBox()
 
     def UpdateInterface(self):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
@@ -452,7 +294,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                                                       self.planeControlsId,
                                                       self.planeCollection,
                                                       self.inputLandmarksSelector.currentNode())
-        self.managePlanesFormLayout.addRow(planeControls)
+        self.managePlanesFormLayout.addWidget(planeControls.widget)
 
         key = "Plane " + str(self.planeControlsId)
         self.planeControlsDictionary[key] = planeControls
@@ -471,7 +313,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             return
         fiducialList = slicer.util.getNode('P' + str(id))
         planeControls = self.planeControlsDictionary[key]
-        self.managePlanesFormLayout.removeWidget(planeControls)
+        self.managePlanesFormLayout.removeWidget(planeControls.widget)
         planeControls.deleteLater()
         planeControls.remove()
         self.planeControlsDictionary.pop(key)
@@ -788,90 +630,37 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         self.normal = None
         # -------------- interface -------------------
         qt.QFrame.__init__(self)
-        self.setLayout(qt.QFormLayout())
-        landmarkLayout = qt.QVBoxLayout()
-        planeLabelLayout = qt.QHBoxLayout()
-        planeLabel = qt.QLabel('Plane ' + str(id) + ":")
-        planeLabelLayout.addWidget(planeLabel)
-        planeLabelLayout.addStretch()
-        addFiducialLabel = qt.QLabel('Add')
-        addFiducialButton = qt.QPushButton(qt.QIcon(":/Icons/AnnotationPointWithArrow.png"), " ")
-        addFiducialButton.setFixedSize(50, 25)
-        addFiducialButton.connect('clicked()', self.addLandMarkClicked)
-        addFiducialButton.setEnabled(True)
-        planeLabelLayout.addWidget(addFiducialLabel)
-        planeLabelLayout.addWidget(addFiducialButton)
-        landmarkLayout.addLayout(planeLabelLayout)
-        label1Layout = qt.QHBoxLayout()
+        # UI setup
+        loader = qt.QUiLoader()
+        moduleName = 'AnglePlanes'
+        scriptedModulesPath = eval('slicer.modules.%s.path' % moduleName.lower())
+        scriptedModulesPath = os.path.dirname(scriptedModulesPath)
+        path = os.path.join(scriptedModulesPath, 'Resources', 'UI', 'PlaneControl.ui')
+        qfile = qt.QFile(path)
+        widget = loader.load(qfile)
+        self.widget = widget
+        # self.anglePlanes.layout.addWidget(widget)
 
-        label1 = qt.QLabel(' L1:')
-        self.landmark1ComboBox = qt.QComboBox()
-        landmark1ComboBox = self.landmark1ComboBox
-        landmark1ComboBox.addItem("Select")
-        landmark1ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
-        label1Layout.addWidget(label1)
-        label1Layout.addWidget(landmark1ComboBox)
-        landmarkLayout.addLayout(label1Layout)
-        label2Layout = qt.QHBoxLayout()
-
-        label2 = qt.QLabel(' L2:')
-        self.landmark2ComboBox = qt.QComboBox()
-        landmark2ComboBox = self.landmark2ComboBox
-        landmark2ComboBox.addItem("Select")
-        landmark2ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
-        label2Layout.addWidget(label2)
-        label2Layout.addWidget(landmark2ComboBox)
-        landmarkLayout.addLayout(label2Layout)
-        label3Layout = qt.QHBoxLayout()
-
-        label3 = qt.QLabel(' L3:')
-        self.landmark3ComboBox = qt.QComboBox()
-        landmark3ComboBox = self.landmark3ComboBox
-        landmark3ComboBox.addItem("Select")
-        landmark3ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
-        label3Layout.addWidget(label3)
-        label3Layout.addWidget(landmark3ComboBox)
-        landmarkLayout.addLayout(label3Layout)
-
-        self.layout().addRow(landmarkLayout)
-
-        self.slideOpacity = ctk.ctkSliderWidget()
-        slideOpacity = self.slideOpacity
-        slideOpacity.singleStep = 0.1
-        slideOpacity.minimum = 0.1
-        slideOpacity.maximum = 1
-        slideOpacity.value = 1.0
-        slideOpacity.toolTip = "Set the opacity of your plane."
-
-        slideOpacity.connect('valueChanged(double)', self.placePlaneClicked)
-
-        landmarkSliderLayout = qt.QHBoxLayout()
-
-        label2 = qt.QLabel(' Opacity:')
-
-        landmarkSliderLayout.addWidget(label2)
-        landmarkSliderLayout.addWidget(self.slideOpacity)
-
-        self.AdaptToBoundingBoxCheckBox = qt.QCheckBox("Adapt to bounding box")
-        self.AdaptToBoundingBoxCheckBox.setChecked(False)
+        self.planeLabel = self.logic.findWidget(self.widget, "planeLabel")
+        self.planeLabel = qt.QLabel('Plane ' + str(id) + ":")
+        self.addFiducialButton = self.logic.findWidget(self.widget, "addFiducialButton")
+        self.landmark1ComboBox = self.logic.findWidget(self.widget, "landmark1ComboBox")
+        self.landmark2ComboBox = self.logic.findWidget(self.widget, "landmark2ComboBox")
+        self.landmark3ComboBox = self.logic.findWidget(self.widget, "landmark3ComboBox")
+        self.slideOpacity = self.logic.findWidget(self.widget, "slideOpacity")
+        self.AdaptToBoundingBoxCheckBox = self.logic.findWidget(self.widget, "AdaptToBoundingBoxCheckBox")
+        self.HidePlaneCheckBox = self.logic.findWidget(self.widget, "HidePlaneCheckBox")
+        self.removePlaneButton = self.logic.findWidget(self.widget, "removePlaneButton")
+        # connections
+        self.addFiducialButton.connect('clicked()', self.addLandMarkClicked)
+        self.landmark1ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+        self.landmark2ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+        self.landmark3ComboBox.connect('currentIndexChanged(QString)', self.placePlaneClicked)
+        self.slideOpacity.connect('valueChanged(double)', self.placePlaneClicked)
         self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)', self.onBBox)
-        landmarkSliderLayout.addWidget(self.AdaptToBoundingBoxCheckBox)
         self.AdaptToBoundingBoxCheckBox.connect('stateChanged(int)',self.placePlaneClicked)
-
-        self.HidePlaneCheckBox = qt.QCheckBox("Hide")
-        self.HidePlaneCheckBox.setChecked(False)
         self.HidePlaneCheckBox.connect('stateChanged(int)', self.update)
-        landmarkSliderLayout.addWidget(self.HidePlaneCheckBox)
-
-        self.layout().addRow(landmarkSliderLayout)
-
-        removeButtonLayout = qt.QHBoxLayout()
-        removeButtonLayout.addStretch(1)
-        removePlaneButton = qt.QPushButton("Remove Plane")
-        removeButtonLayout.addWidget(removePlaneButton)
-        self.layout().addRow(removeButtonLayout)
-        removePlaneButton.connect('clicked(bool)', self.onRemove)
-
+        self.removePlaneButton.connect('clicked(bool)', self.onRemove)
         # fiducial list for the plane
         self.logic.updateLandmarkComboBox(self.fidlist, self.landmark1ComboBox)
         self.logic.updateLandmarkComboBox(self.fidlist, self.landmark2ComboBox)
@@ -978,13 +767,26 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.selectedModel = None
         self.interface = interface
 
+    def get(self, objectName):
+        return self.findWidget(self.interface.widget, objectName)
+
+    def findWidget(self, widget, objectName):
+        if widget.objectName == objectName:
+            return widget
+        else:
+            for w in widget.children():
+                resulting_widget = self.findWidget(w, objectName)
+                if resulting_widget:
+                    return resulting_widget
+            return None
+
     def UpdateThreeDView(self, landmarkLabel):
         # Update the 3D view on Slicer
         if not self.selectedFidList:
             return
         if not self.selectedModel:
             return
-        print "UpdateThreeDView"
+        # print "UpdateThreeDView"
         active = self.selectedFidList
         #deactivate all landmarks
         list = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsFiducialNode")
@@ -1392,9 +1194,9 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         return midCoord
 
     def getMatrix(self, slice):
-        print "--- get Matrix ---"
+        # print "--- get Matrix ---"
         self.mat = slice.GetSliceToRAS()
-        print self.mat
+        # print self.mat
         # ---------------------- RED SLICE -----------------------#
         # Matrix with the elements of SliceToRAS
         m = numpy.matrix([[self.mat.GetElement(0, 0), self.mat.GetElement(0, 1), self.mat.GetElement(0, 2),
@@ -1405,11 +1207,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                            self.mat.GetElement(2, 3)],
                           [self.mat.GetElement(3, 0), self.mat.GetElement(3, 1), self.mat.GetElement(3, 2),
                            self.mat.GetElement(3, 3)]])
-        print m
+        # print m
         return m
 
     def defineNormal(self, matrix):
-        print "--- defineNormal ---"
+        # print "--- defineNormal ---"
         # Normal vector to the Red slice:
         n_vector = numpy.matrix([[0], [0], [1], [1]])
 
@@ -1417,7 +1219,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         A = numpy.matrix([[0], [0], [0], [1]])
 
         normalVector = matrix * n_vector
-        print "n : \n", normalVector
+        # print "n : \n", normalVector
         A = matrix * A
 
         normalVector1 = normalVector
@@ -1426,128 +1228,128 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         normalVector1[1] = normalVector[1] - A[1]
         normalVector1[2] = normalVector[2] - A[2]
 
-        print normalVector1
+        # print normalVector1
 
         return normalVector1
 
     def getAngle(self, normalVect1, normalVect2):
-        print "--- getAngle ---"
+        # print "--- getAngle ---"
         norm1 = sqrt(
             normalVect1[0] * normalVect1[0] + normalVect1[1] * normalVect1[1] + normalVect1[2] * normalVect1[2])
-        print "norme 1: \n", norm1
+        # print "norme 1: \n", norm1
         norm2 = sqrt(
             normalVect2[0] * normalVect2[0] + normalVect2[1] * normalVect2[1] + normalVect2[2] * normalVect2[2])
-        print "norme 2: \n", norm2
+        # print "norme 2: \n", norm2
 
 
         scalar_product = (
             normalVect1[0] * normalVect2[0] + normalVect1[1] * normalVect2[1] + normalVect1[2] * normalVect2[2])
-        print "scalar product : \n", scalar_product
+        # print "scalar product : \n", scalar_product
 
         angle = acos(scalar_product / (norm1 * norm2))
 
-        print "radian angle : ", angle
+        # print "radian angle : ", angle
 
         angle_degree = angle * 180 / pi
-        print "Angle in degree", angle_degree
+        # print "Angle in degree", angle_degree
 
 
         norm1_RL = sqrt(normalVect1[1] * normalVect1[1] + normalVect1[2] * normalVect1[2])
-        print "norme RL: \n", norm1_RL
+        # print "norme RL: \n", norm1_RL
         norm2_RL = sqrt(normalVect2[1] * normalVect2[1] + normalVect2[2] * normalVect2[2])
-        print "norme RL: \n", norm2_RL
+        # print "norme RL: \n", norm2_RL
 
         if (norm1_RL == 0 or norm2_RL == 0):
             self.angle_degre_RL = 0
             self.angle_degre_RL_comp = 0
         else:
             scalar_product_RL = (normalVect1[1] * normalVect2[1] + normalVect1[2] * normalVect2[2])
-            print "scalar product : \n", scalar_product_RL
+            # print "scalar product : \n", scalar_product_RL
             inter = scalar_product_RL / (norm1_RL * norm2_RL)
             if inter >= [[ 0.99999]]:
                 angleRL = 0
             else:
                 angleRL = acos(inter)
-            print "radian angle : ", angleRL
+            # print "radian angle : ", angleRL
 
             self.angle_degre_RL = angleRL * 180 / pi
             self.angle_degre_RL = round(self.angle_degre_RL, 2)
-            print self.angle_degre_RL
+            # print self.angle_degre_RL
             self.angle_degre_RL_comp = 180 - self.angle_degre_RL
 
         norm1_SI = sqrt(normalVect1[0] * normalVect1[0] + normalVect1[1] * normalVect1[1])
-        print "norme1_SI : \n", norm1_SI
+        # print "norme1_SI : \n", norm1_SI
         norm2_SI = sqrt(normalVect2[0] * normalVect2[0] + normalVect2[1] * normalVect2[1])
-        print "norme2_SI : \n", norm2_SI
+        # print "norme2_SI : \n", norm2_SI
 
         if (norm1_SI == 0 or norm2_SI == 0):
             self.angle_degre_SI = 0
             self.angle_degre_SI_comp = 0
         else:
             scalar_product_SI = (normalVect1[0] * normalVect2[0] + normalVect1[1] * normalVect2[1])
-            print "scalar product_SI : \n", scalar_product_SI
+            # print "scalar product_SI : \n", scalar_product_SI
 
             inter = scalar_product_SI / (norm1_SI * norm2_SI)
             if inter >= [[ 0.99999]]:
                 angleSI = 0
             else:
                 angleSI = acos(inter)
-            print "radian angle : ", angleSI
+            # print "radian angle : ", angleSI
 
             self.angle_degre_SI = angleSI * 180 / pi
             self.angle_degre_SI = round(self.angle_degre_SI, 2)
-            print self.angle_degre_SI
+            # print self.angle_degre_SI
             self.angle_degre_SI_comp = 180 - self.angle_degre_SI
-            print self.angle_degre_SI_comp
+            # print self.angle_degre_SI_comp
 
         norm1_AP = sqrt(normalVect1[0] * normalVect1[0] + normalVect1[2] * normalVect1[2])
-        print "norme1_SI : \n", norm1_AP
+        # print "norme1_SI : \n", norm1_AP
         norm2_AP = sqrt(normalVect2[0] * normalVect2[0] + normalVect2[2] * normalVect2[2])
-        print "norme2_SI : \n", norm2_AP
+        # print "norme2_SI : \n", norm2_AP
 
         if (norm1_AP == 0 or norm2_AP == 0):
             self.angle_degre_AP = 0
             self.angle_degre_AP_comp = 0
         else:
             scalar_product_AP = (normalVect1[0] * normalVect2[0] + normalVect1[2] * normalVect2[2])
-            print "scalar product_SI : \n", scalar_product_AP
+            # print "scalar product_SI : \n", scalar_product_AP
 
-            print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
+            # print "VALUE :", scalar_product_AP/(norm1_AP*norm2_AP)
             inter = scalar_product_AP / (norm1_AP * norm2_AP)
             if inter >= [[ 0.99999]]:
                 angleAP = 0
             else:
                 angleAP = acos(inter)
 
-            print "radian angle : ", angleAP
+            # print "radian angle : ", angleAP
 
             self.angle_degre_AP = angleAP * 180 / pi
             self.angle_degre_AP = round(self.angle_degre_AP, 2)
-            print self.angle_degre_AP
+            # print self.angle_degre_AP
             self.angle_degre_AP_comp = 180 - self.angle_degre_AP
 
     def normalLandmarks(self, GA, GB):
-        print "--- normalLandmarks ---"
+        # print "--- normalLandmarks ---"
         Vn = numpy.matrix([[0], [0], [0]])
         Vn[0] = GA[1] * GB[2] - GA[2] * GB[1]
         Vn[1] = GA[2] * GB[0] - GA[0] * GB[2]
         Vn[2] = GA[0] * GB[1] - GA[1] * GB[0]
 
-        print "Vn = ",Vn
+        # print "Vn = ",Vn
 
         norm_Vn = sqrt(Vn[0] * Vn[0] + Vn[1] * Vn[1] + Vn[2] * Vn[2])
 
-        print "norm_Vn = ",norm_Vn
+        # print "norm_Vn = ",norm_Vn
 
         Normal = Vn / norm_Vn
 
-        print "N = ",Normal
+        # print "N = ",Normal
 
         return Normal
 
     def planeLandmarks(self, fidList, Landmark1Label, Landmark2Label, Landmark3Label, Normal,
                        AdaptToBoundingBoxCheckBox, sliderOpacity, planeCollection, actor):
-        print "--- planeLandmarks ---"
+        # print "--- planeLandmarks ---"
         # Limit the number of 3 landmarks to define a plane
         # Keep the coordinates of the landmarks
         landmark1ID = self.findIDFromLabel(fidList, Landmark1Label)
@@ -1555,7 +1357,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         landmark3ID = self.findIDFromLabel(fidList, Landmark3Label)
 
         if not (landmark1ID and landmark2ID and landmark3ID):
-            print "landmark not defined"
+            # print "landmark not defined"
             return
 
         if AdaptToBoundingBoxCheckBox.isChecked():
@@ -1566,19 +1368,19 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         coord = numpy.zeros(3)
         landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
         fidList.GetNthFiducialPosition(landmark1Index, coord)
-        print "Landmark1Value: ", coord
+        # print "Landmark1Value: ", coord
         r1 = coord[0]
         a1 = coord[1]
         s1 = coord[2]
         landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
         fidList.GetNthFiducialPosition(landmark2Index, coord)
-        print "Landmark2Value: ", coord
+        # print "Landmark2Value: ", coord
         r2 = coord[0]
         a2 = coord[1]
         s2 = coord[2]
         landmark3Index = fidList.GetMarkupIndexByID(landmark3ID)
         fidList.GetNthFiducialPosition(landmark3Index, coord)
-        print "Landmark3Value: ", coord
+        # print "Landmark3Value: ", coord
         r3 = coord[0]
         a3 = coord[1]
         s3 = coord[2]
@@ -1592,7 +1394,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             points.SetPoint(0, r1, a1, s1)
             points.SetPoint(1, r2, a2, s2)
             points.SetPoint(2, r3, a3, s3)
-        print "points ", points
+        # print "points ", points
 
         polydata = vtk.vtkPolyData()
         polydata.SetPoints(points)
@@ -1604,7 +1406,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
         G = centerOfMass.GetCenter()
 
-        print "Center of mass = ",G
+        # print "Center of mass = ",G
 
         A = (r1, a1, s1)
         B = (r2, a2, s2)
@@ -1616,7 +1418,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GA[1] = A[1] - G[1]
         GA[2] = A[2] - G[2]
 
-        print "GA = ", GA
+        # print "GA = ", GA
 
         # Vector BG
         GB = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1624,7 +1426,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GB[1] = B[1] - G[1]
         GB[2] = B[2] - G[2]
 
-        print "GB = ", GB
+        # print "GB = ", GB
 
         # Vector CG
         GC = numpy.matrix([[0.0], [0.0], [0.0]])
@@ -1632,7 +1434,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         GC[1] = C[1] - G[1]
         GC[2] = C[2] - G[2]
 
-        print "GC = ", GC
+        # print "GC = ", GC
 
         normal = self.normalLandmarks(GA, GB)
 
@@ -1644,21 +1446,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         D[1] = slider * GA[1] + G[1]
         D[2] = slider * GA[2] + G[2]
 
-        print "Slider value : ", slider
+        # print "Slider value : ", slider
 
-        print "D = ",D
+        # print "D = ",D
 
         E[0] = slider * GB[0] + G[0]
         E[1] = slider * GB[1] + G[1]
         E[2] = slider * GB[2] + G[2]
 
-        print "E = ",E
+        # print "E = ",E
 
         F[0] = slider * GC[0] + G[0]
         F[1] = slider * GC[1] + G[1]
         F[2] = slider * GC[2] + G[2]
 
-        print "F = ",F
+        # print "F = ",F
 
         planeSource = vtk.vtkPlaneSource()
         planeSource.SetNormal(normal[0], normal[1], normal[2])
