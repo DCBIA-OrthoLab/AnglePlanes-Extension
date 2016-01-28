@@ -77,6 +77,8 @@ class AnglePlanes(ScriptedLoadableModule):
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
+        reload(AnglePlanesLogic)
+        reload(PlaneControl)
 
         self.moduleName = "AnglePlanes"
         self.i = 0
@@ -86,7 +88,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeCollection = vtk.vtkPlaneCollection()
         self.ignoredNodeNames = ('Red Volume Slice', 'Yellow Volume Slice', 'Green Volume Slice')
         self.colorSliceVolumes = dict()
-        self.n_vector = numpy.matrix([[0], [0], [1], [1]])
         self.interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
 
         # UI setup
@@ -562,52 +563,11 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.logic.getAngle(normal1, normal2)
 
     def onSavePlanes(self):
-        self.savePlanes()
-
-    def savePlanes(self, filename=None):
-        tempDictionary = {}
-        sliceRed = slicer.util.getNode(self.logic.ColorNodeCorrespondence['Red'])
-        tempDictionary["Red"] = self.logic.getMatrix(sliceRed).tolist()
-        sliceYellow = slicer.util.getNode(self.logic.ColorNodeCorrespondence['Yellow'])
-        tempDictionary["Yellow"] = self.logic.getMatrix(sliceYellow).tolist()
-        sliceGreen = slicer.util.getNode(self.logic.ColorNodeCorrespondence['Green'])
-        tempDictionary["Green"] = self.logic.getMatrix(sliceGreen).tolist()
-        if filename is None:
-            filename = qt.QFileDialog.getSaveFileName(parent=self, caption='Save file')
-        if filename != "":
-            fileObj = open(filename, "wb")
-            pickle.dump(tempDictionary, fileObj)
-            fileObj.close()
+        self.logic.savePlanes()
 
     def onReadPlanes(self):
-        self.readPlanes()
+        self.logic.readPlanes()
         self.onComputeBox()
-
-    def readPlanes(self, filename=None):
-        if filename is None:
-            filename = qt.QFileDialog.getOpenFileName(parent=self, caption='Open file')
-        if filename != "":
-            fileObj = open(filename, "rb")
-            tempDictionary = pickle.load(fileObj)
-            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeRed')
-            matList = tempDictionary["Red"]
-            matNode = node.GetSliceToRAS()
-            for col in range(0, len(matList)):
-                for row in range(0, len(matList[col])):
-                    matNode.SetElement(col, row, matList[col][row])
-            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeYellow')
-            matList = tempDictionary["Yellow"]
-            matNode = node.GetSliceToRAS()
-            for col in range(0, len(matList)):
-                for row in range(0, len(matList[col])):
-                    matNode.SetElement(col, row, matList[col][row])
-            node = slicer.mrmlScene.GetNodeByID('vtkMRMLSliceNodeGreen')
-            matList = tempDictionary["Green"]
-            matNode = node.GetSliceToRAS()
-            for col in range(0, len(matList)):
-                for row in range(0, len(matList[col])):
-                    matNode.SetElement(col, row, matList[col][row])
-            fileObj.close()
 
 class AnglePlanesTest(ScriptedLoadableModuleTest):
     def setUp(self):

@@ -234,6 +234,9 @@
    </item>
    <item>
     <widget class="ctkCollapsibleButton" name="midPointGroupBox">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="text">
       <string>Define middle point between two landmarks:</string>
      </property>

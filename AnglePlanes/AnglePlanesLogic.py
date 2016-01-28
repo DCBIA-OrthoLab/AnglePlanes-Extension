@@ -1,6 +1,7 @@
 from __main__ import vtk, qt, ctk, slicer
 import numpy
 import time
+import pickle
 from math import *
 import json
 from slicer.ScriptedLoadableModule import *
@@ -449,16 +450,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         # print "--- get Matrix ---"
         self.mat = slice.GetSliceToRAS()
         # print self.mat
-        # ---------------------- RED SLICE -----------------------#
         # Matrix with the elements of SliceToRAS
-        m = numpy.matrix([[self.mat.GetElement(0, 0), self.mat.GetElement(0, 1), self.mat.GetElement(0, 2),
-                           self.mat.GetElement(0, 3)],
-                          [self.mat.GetElement(1, 0), self.mat.GetElement(1, 1), self.mat.GetElement(1, 2),
-                           self.mat.GetElement(1, 3)],
-                          [self.mat.GetElement(2, 0), self.mat.GetElement(2, 1), self.mat.GetElement(2, 2),
-                           self.mat.GetElement(2, 3)],
-                          [self.mat.GetElement(3, 0), self.mat.GetElement(3, 1), self.mat.GetElement(3, 2),
-                           self.mat.GetElement(3, 3)]])
+        m = numpy.matrix([[self.mat.GetElement(0, 0), self.mat.GetElement(0, 1), self.mat.GetElement(0, 2), self.mat.GetElement(0, 3)],
+                          [self.mat.GetElement(1, 0), self.mat.GetElement(1, 1), self.mat.GetElement(1, 2), self.mat.GetElement(1, 3)],
+                          [self.mat.GetElement(2, 0), self.mat.GetElement(2, 1), self.mat.GetElement(2, 2), self.mat.GetElement(2, 3)],
+                          [self.mat.GetElement(3, 0), self.mat.GetElement(3, 1), self.mat.GetElement(3, 2), self.mat.GetElement(3, 3)]])
         # print m
         return m
 
@@ -827,6 +823,33 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         self.addArrayFromIdList(listID, connectedModel, arrayName)
         self.displayROI(connectedModel, arrayName)
         return ROIPointListID
+
+    def savePlanes(self, filename=None):
+        tempDictionary = {}
+        for key in self.ColorNodeCorrespondence:
+            slice = slicer.util.getNode(self.ColorNodeCorrespondence[key])
+            tempDictionary[key] = self.getMatrix(slice).tolist()
+        if filename is None:
+            filename = qt.QFileDialog.getSaveFileName(parent=self.interface, caption='Save file')
+        if filename != "":
+            fileObj = open(filename, "wb")
+            pickle.dump(tempDictionary, fileObj)
+            fileObj.close()
+
+    def readPlanes(self, filename=None):
+        if filename is None:
+            filename = qt.QFileDialog.getOpenFileName(parent=self.interface, caption='Open file')
+        if filename != "":
+            fileObj = open(filename, "rb")
+            tempDictionary = pickle.load(fileObj)
+            for key in self.ColorNodeCorrespondence:
+                node = slicer.mrmlScene.GetNodeByID(self.ColorNodeCorrespondence[key])
+                matList = tempDictionary[key]
+                matNode = node.GetSliceToRAS()
+                for col in range(0, len(matList)):
+                    for row in range(0, len(matList[col])):
+                        matNode.SetElement(col, row, matList[col][row])
+            fileObj.close()
 
     def warningMessage(self, message):
         messageBox = ctk.ctkMessageBox()
