@@ -252,6 +252,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                 else:
                     landmarkSelector.setCurrentNode(None)
                     return
+            else:
+                landmarks.SetAttribute("hardenModelID",model.GetAttribute("hardenModelID"))
         # creation of the data structure
         else:
             self.createNewDataStructure(landmarks, model, onSurface)
