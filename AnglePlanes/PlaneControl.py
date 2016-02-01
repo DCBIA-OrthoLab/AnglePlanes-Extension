@@ -32,7 +32,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
         # self.anglePlanes.layout.addWidget(widget)
 
         self.planeLabel = self.logic.findWidget(self.widget, "planeLabel")
-        self.planeLabel = qt.QLabel('Plane ' + str(id) + ":")
+        self.planeLabel.setText('Plane ' + str(id) + ":")
         self.addFiducialButton = self.logic.findWidget(self.widget, "addFiducialButton")
         self.landmark1ComboBox = self.logic.findWidget(self.widget, "landmark1ComboBox")
         self.landmark2ComboBox = self.logic.findWidget(self.widget, "landmark2ComboBox")

@@ -409,7 +409,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         for ID, value in landmarkDescription.iteritems():
             if value["landmarkLabel"] == landmarkLabel:
                 return ID
-        return False
+        return None
 
     def getClosestPointIndex(self, fidNode, inputPolyData, landmarkID):
         landmarkCoord = numpy.zeros(3)
