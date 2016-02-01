@@ -867,8 +867,10 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         return encodedString
 
     def decodeJSON(self, input):
-        input = input.replace('\'','\"')
-        return self.byteify(json.loads(input))
+        if input:
+            input = input.replace('\'','\"')
+            return self.byteify(json.loads(input))
+        return None
 
     def byteify(self, input):
         if isinstance(input, dict):

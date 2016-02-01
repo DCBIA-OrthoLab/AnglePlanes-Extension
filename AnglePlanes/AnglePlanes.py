@@ -190,6 +190,17 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.planeComboBox2.setCurrentIndex(0)
         self.valueComboBox()
 
+    def enter(self):
+        model = self.inputModelSelector.currentNode()
+        fidlist = self.inputLandmarksSelector.currentNode()
+
+        if fidlist:
+            if fidlist.GetAttribute("connectedModelID") != model.GetID():
+                self.inputModelSelector.setCurrentNode(None)
+                self.inputLandmarksSelector.setCurrentNode(None)
+                self.landmarkComboBox.clear()
+        self.UpdateInterface()
+
     def UpdateInterface(self):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
 
