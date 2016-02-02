@@ -352,7 +352,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         bound = [maxValue, -maxValue, maxValue, -maxValue, maxValue, -maxValue]
         for i in positionOfVisibleNodes:
             node = slicer.mrmlScene.GetNthNodeByClass(i, "vtkMRMLModelNode")
-            polydata = node.GetPolyData()
+            model = self.logic.createIntermediateHardenModel(node)
+            polydata = model.GetPolyData()
             if polydata is None or not hasattr(polydata, "GetBounds"):
                 continue
             tempbound = polydata.GetBounds()
@@ -446,6 +447,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             labelmapVolumeDisplayNode.VisibilityOn()
             self.colorSliceVolumes[colorName] = sampleVolumeNode.GetID()
         sampleVolumeNode = slicer.mrmlScene.GetNodeByID(self.colorSliceVolumes[colorName])
+        sampleVolumeNode.HideFromEditorsOn()
         sampleVolumeNode.SetOrigin(origin[0], origin[1], origin[2])
         sampleVolumeNode.SetSpacing(dim[0], dim[1], dim[2])
         if not hasattr(slicer, 'vtkMRMLLabelMapVolumeNode'):

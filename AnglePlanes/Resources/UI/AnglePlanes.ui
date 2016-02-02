@@ -23,7 +23,7 @@
    <item>
     <widget class="ctkCollapsibleButton" name="loadCollapsibleButton">
      <property name="text">
-      <string>CollapsibleButton</string>
+      <string>Scene</string>
      </property>
      <property name="contentsFrameShape">
       <enum>QFrame::StyledPanel</enum>
