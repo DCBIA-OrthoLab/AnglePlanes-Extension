@@ -40,13 +40,6 @@ class ModelAddedClass(VTKObservationMixin):
     def onModelNodePolyDataModified(self, caller, eventId):
         pass
 
-class AnglePlanesMiddleFiducial():
-    def __init__(self, P1, P2, onSurface, nodeID):
-        self.P1 = P1
-        self.P2 = P2
-        self.onSurface = onSurface
-        self.nodeID = nodeID
-
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
 
