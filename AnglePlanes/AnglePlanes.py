@@ -70,6 +70,7 @@ class AnglePlanes(ScriptedLoadableModule):
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
+        print "-------Angle Planes Widget Setup-------"
 
         self.moduleName = "AnglePlanes"
         self.i = 0
@@ -96,6 +97,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.layout.addWidget(widget)
 
         #--------------------------- Scene --------------------------#
+        self.SceneCollapsibleButton = self.logic.get("SceneCollapsibleButton") # this atribute is usefull for Longitudinal quantification extension
         treeView = self.logic.get("treeView")
         treeView.setMRMLScene(slicer.app.mrmlScene())
         treeView.sceneModel().setHorizontalHeaderLabels(["Models"])
@@ -104,6 +106,8 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.autoChangeLayout = self.logic.get("autoChangeLayout")
         self.computeBox = self.logic.get("computeBox")
         # -------------------------------Manage planes---------------------------------
+        self.inputModelLabel = self.logic.get("inputModelLabel")  # this atribute is usefull for Longitudinal quantification extension
+        self.inputLandmarksLabel = self.logic.get("inputLandmarksLabel")  # this atribute is usefull for Longitudinal quantification extension
         self.CollapsibleButton = self.logic.get("CollapsibleButton")
         self.managePlanesFormLayout = self.logic.get("managePlanesFormLayout")
         self.inputModelSelector = self.logic.get("inputModelSelector")

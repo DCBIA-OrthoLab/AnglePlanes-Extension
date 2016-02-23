@@ -21,7 +21,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="ctkCollapsibleButton" name="loadCollapsibleButton">
+    <widget class="ctkCollapsibleButton" name="SceneCollapsibleButton">
      <property name="text">
       <string>Scene</string>
      </property>
@@ -96,9 +96,9 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_3">
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout">
+          <layout class="QHBoxLayout" name="inputModelLayout">
            <item>
-            <widget class="QLabel" name="label">
+            <widget class="QLabel" name="inputModelLabel">
              <property name="minimumSize">
               <size>
                <width>124</width>
@@ -140,9 +140,9 @@
           </layout>
          </item>
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <layout class="QHBoxLayout" name="inputLandmarksLayout">
            <item>
-            <widget class="QLabel" name="label_2">
+            <widget class="QLabel" name="inputLandmarksLabel">
              <property name="text">
               <string>Connected Landmarks:</string>
              </property>
