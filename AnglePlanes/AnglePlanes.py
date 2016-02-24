@@ -114,6 +114,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.inputModelSelector.setMRMLScene(slicer.mrmlScene)
         self.inputLandmarksSelector = self.logic.get("inputLandmarksSelector")
         self.inputLandmarksSelector.setMRMLScene(slicer.mrmlScene)
+        self.inputLandmarksSelector.setEnabled(False) # The "enable" property seems to not be imported from the .ui
         self.loadLandmarksOnSurfacCheckBox = self.logic.get("loadLandmarksOnSurfacCheckBox")
         self.addPlaneButton = self.logic.get("addPlaneButton")
         self.landmarkComboBox = self.logic.get("landmarkComboBox")
