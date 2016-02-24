@@ -273,7 +273,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 if self.planeControlsDictionary[x].PlaneIsDefined():
                     planeComboBox.addItem(x)
         except NameError:
-            dummy = None
+            print "exept in fillColorsComboBox"
 
     def updateOnSurfaceCheckBoxes(self):
         numberOfVisibleModels = len(self.getPositionOfModelNodes(True))
@@ -300,8 +300,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.planeControlsId = keyLoad
         else:
             self.planeControlsId += 1
-        # if len(self.planeControlsDictionary) >= 1:
-        #     self.addPlaneButton.setDisabled(True)
         planeControls = AnglePlanesWidgetPlaneControl(self,
                                                       self.planeControlsId,
                                                       self.planeCollection,
@@ -322,7 +320,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         if key not in self.planeControlsDictionary.keys():
             print "Key error"
             return
-        fiducialList = slicer.util.getNode('P' + str(id))
+        if self.planeComboBox1.currentText == key:
+            self.planeComboBox1.setCurrentIndex(0)
+        if self.planeComboBox2.currentText == key:
+            self.planeComboBox2.setCurrentIndex(0)
         planeControls = self.planeControlsDictionary[key]
         self.managePlanesFormLayout.removeWidget(planeControls.widget)
         planeControls.deleteLater()
