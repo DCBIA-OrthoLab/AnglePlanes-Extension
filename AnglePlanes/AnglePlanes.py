@@ -197,6 +197,19 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 self.landmarkComboBox.clear()
         self.UpdateInterface()
 
+        # Checking the names of the fiducials
+        list = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsFiducialNode")
+        end = list.GetNumberOfItems()
+        for i in range(0,end):
+            fidList = list.GetItemAsObject(i)
+            landmarkDescription = self.logic.decodeJSON(fidList.GetAttribute("landmarkDescription"))
+            if landmarkDescription:
+                for n in range(fidList.GetNumberOfMarkups()):
+                    markupID = fidList.GetNthMarkupID(n)
+                    markupLabel = fidList.GetNthMarkupLabel(n)
+                    landmarkDescription[markupID]["landmarkLabel"] = markupLabel
+                fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
+
     def UpdateInterface(self):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
 
@@ -887,7 +900,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         for n in range(landmarks.GetNumberOfMarkups()):
             markupID = landmarks.GetNthMarkupID(n)
             landmarkDescription[markupID] = dict()
-            landmarkLabel = landmarks.GetName() + '-' + str(n + 1)
+            landmarkLabel = landmarks.GetNthMarkupLabel(n)
             landmarkDescription[markupID]["landmarkLabel"] = landmarkLabel
             landmarkDescription[markupID]["ROIradius"] = 0
             landmarkDescription[markupID]["projection"] = dict()
