@@ -40,13 +40,6 @@ class ModelAddedClass(VTKObservationMixin):
     def onModelNodePolyDataModified(self, caller, eventId):
         pass
 
-class AnglePlanesMiddleFiducial():
-    def __init__(self, P1, P2, onSurface, nodeID):
-        self.P1 = P1
-        self.P2 = P2
-        self.onSurface = onSurface
-        self.nodeID = nodeID
-
 class AnglePlanes(ScriptedLoadableModule):
     def __init__(self, parent):
 
@@ -77,6 +70,7 @@ class AnglePlanes(ScriptedLoadableModule):
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
+        print "-------Angle Planes Widget Setup-------"
 
         self.moduleName = "AnglePlanes"
         self.i = 0
@@ -103,6 +97,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.layout.addWidget(widget)
 
         #--------------------------- Scene --------------------------#
+        self.SceneCollapsibleButton = self.logic.get("SceneCollapsibleButton") # this atribute is usefull for Longitudinal quantification extension
         treeView = self.logic.get("treeView")
         treeView.setMRMLScene(slicer.app.mrmlScene())
         treeView.sceneModel().setHorizontalHeaderLabels(["Models"])
@@ -111,12 +106,15 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.autoChangeLayout = self.logic.get("autoChangeLayout")
         self.computeBox = self.logic.get("computeBox")
         # -------------------------------Manage planes---------------------------------
+        self.inputModelLabel = self.logic.get("inputModelLabel")  # this atribute is usefull for Longitudinal quantification extension
+        self.inputLandmarksLabel = self.logic.get("inputLandmarksLabel")  # this atribute is usefull for Longitudinal quantification extension
         self.CollapsibleButton = self.logic.get("CollapsibleButton")
         self.managePlanesFormLayout = self.logic.get("managePlanesFormLayout")
         self.inputModelSelector = self.logic.get("inputModelSelector")
         self.inputModelSelector.setMRMLScene(slicer.mrmlScene)
         self.inputLandmarksSelector = self.logic.get("inputLandmarksSelector")
         self.inputLandmarksSelector.setMRMLScene(slicer.mrmlScene)
+        self.inputLandmarksSelector.setEnabled(False) # The "enable" property seems to not be imported from the .ui
         self.loadLandmarksOnSurfacCheckBox = self.logic.get("loadLandmarksOnSurfacCheckBox")
         self.addPlaneButton = self.logic.get("addPlaneButton")
         self.landmarkComboBox = self.logic.get("landmarkComboBox")
@@ -199,6 +197,19 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 self.landmarkComboBox.clear()
         self.UpdateInterface()
 
+        # Checking the names of the fiducials
+        list = slicer.mrmlScene.GetNodesByClass("vtkMRMLMarkupsFiducialNode")
+        end = list.GetNumberOfItems()
+        for i in range(0,end):
+            fidList = list.GetItemAsObject(i)
+            landmarkDescription = self.logic.decodeJSON(fidList.GetAttribute("landmarkDescription"))
+            if landmarkDescription:
+                for n in range(fidList.GetNumberOfMarkups()):
+                    markupID = fidList.GetNthMarkupID(n)
+                    markupLabel = fidList.GetNthMarkupLabel(n)
+                    landmarkDescription[markupID]["landmarkLabel"] = markupLabel
+                fidList.SetAttribute("landmarkDescription",self.logic.encodeJSON(landmarkDescription))
+
     def UpdateInterface(self):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
 
@@ -275,7 +286,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 if self.planeControlsDictionary[x].PlaneIsDefined():
                     planeComboBox.addItem(x)
         except NameError:
-            dummy = None
+            print "exept in fillColorsComboBox"
 
     def updateOnSurfaceCheckBoxes(self):
         numberOfVisibleModels = len(self.getPositionOfModelNodes(True))
@@ -302,8 +313,6 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.planeControlsId = keyLoad
         else:
             self.planeControlsId += 1
-        # if len(self.planeControlsDictionary) >= 1:
-        #     self.addPlaneButton.setDisabled(True)
         planeControls = AnglePlanesWidgetPlaneControl(self,
                                                       self.planeControlsId,
                                                       self.planeCollection,
@@ -324,7 +333,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         if key not in self.planeControlsDictionary.keys():
             print "Key error"
             return
-        fiducialList = slicer.util.getNode('P' + str(id))
+        if self.planeComboBox1.currentText == key:
+            self.planeComboBox1.setCurrentIndex(0)
+        if self.planeComboBox2.currentText == key:
+            self.planeComboBox2.setCurrentIndex(0)
         planeControls = self.planeControlsDictionary[key]
         self.managePlanesFormLayout.removeWidget(planeControls.widget)
         planeControls.deleteLater()
@@ -888,7 +900,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         for n in range(landmarks.GetNumberOfMarkups()):
             markupID = landmarks.GetNthMarkupID(n)
             landmarkDescription[markupID] = dict()
-            landmarkLabel = landmarks.GetName() + '-' + str(n + 1)
+            landmarkLabel = landmarks.GetNthMarkupLabel(n)
             landmarkDescription[markupID]["landmarkLabel"] = landmarkLabel
             landmarkDescription[markupID]["ROIradius"] = 0
             landmarkDescription[markupID]["projection"] = dict()
