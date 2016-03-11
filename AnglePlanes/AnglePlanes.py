@@ -339,6 +339,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.planeComboBox2.setCurrentIndex(0)
         planeControls = self.planeControlsDictionary[key]
         self.managePlanesFormLayout.removeWidget(planeControls.widget)
+        planeControls.widget.hide()
         planeControls.deleteLater()
         planeControls.remove()
         self.planeControlsDictionary.pop(key)
@@ -499,6 +500,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
 
     def onCloseScene(self, obj, event):
         self.colorSliceVolumes = dict()
+        self.planeControlsId = 0
         list = slicer.mrmlScene.GetNodesByClass("vtkMRMLModelNode")
         end = list.GetNumberOfItems()
         for i in range(0,end):
@@ -516,6 +518,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.getAngle_SI_comp.setText("0")
         self.getAngle_AP.setText("0")
         self.getAngle_AP_comp.setText("0")
+        self.landmarkComboBox.clear()
 
     def angleValue(self):
         self.valueComboBox()
@@ -1661,10 +1664,10 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         widget = slicer.modules.AnglePlanesWidget
 
         self.delayDisplay('Saving planes')
-        widget.savePlanes("test.p")
+        widget.logic.savePlanes("test.p")
 
         self.delayDisplay('Loading planes')
-        widget.readPlanes("test.p")
+        widget.logic.readPlanes("test.p")
 
         self.delayDisplay('Adding planes')
 

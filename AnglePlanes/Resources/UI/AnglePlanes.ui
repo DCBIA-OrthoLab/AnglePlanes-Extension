@@ -101,7 +101,7 @@
             <widget class="QLabel" name="inputModelLabel">
              <property name="minimumSize">
               <size>
-               <width>124</width>
+               <width>145</width>
                <height>0</height>
               </size>
              </property>
@@ -144,7 +144,7 @@
            <item>
             <widget class="QLabel" name="inputLandmarksLabel">
              <property name="text">
-              <string>Connected Landmarks:</string>
+              <string>Connected Landmarks List:</string>
              </property>
             </widget>
            </item>
