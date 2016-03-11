@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="qMRMLWidget" name="Form">
+ <class>AnglePlanes</class>
+ <widget class="qMRMLWidget" name="AnglePlanes">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
     <width>481</width>
-    <height>976</height>
+    <height>914</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -322,7 +322,7 @@
       <string>Choose Planes:</string>
      </property>
      <property name="checked">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
      <property name="contentsFrameShape">
       <enum>QFrame::StyledPanel</enum>
