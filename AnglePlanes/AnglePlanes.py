@@ -510,7 +510,12 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             self.RemoveManualPlane(x[len('Plane '):])
         self.planeControlsDictionary = dict()
         self.addPlaneButton.setDisabled(True)
-            # globals()[self.moduleName] = slicer.util.reloadScriptedModule(self.moduleName)
+        self.getAngle_RL.setText("0")
+        self.getAngle_RL_comp.setText("0")
+        self.getAngle_SI.setText("0")
+        self.getAngle_SI_comp.setText("0")
+        self.getAngle_AP.setText("0")
+        self.getAngle_AP_comp.setText("0")
 
     def angleValue(self):
         self.valueComboBox()
