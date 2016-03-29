@@ -1033,7 +1033,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         obj.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
         self.updateAllLandmarkComboBox(obj, markupID)
         self.interface.UpdateInterface()
-        self.onPointModifiedEvent(obj,None)
+        qt.QTimer.singleShot(0, lambda : self.onPointModifiedEvent(obj,None))
 
     def updateMidPoint(self, fidList, landmarkID):
         landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
