@@ -1576,7 +1576,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             slice = slicer.util.getNode(self.ColorNodeCorrespondence[key])
             tempDictionary[key] = self.getMatrix(slice).tolist()
         if filename is None:
-            filename = qt.QFileDialog.getSaveFileName(parent=self.interface, caption='Save file')
+            filename = qt.QFileDialog.getSaveFileName(self.interface.parent, "Save file")
         if filename != "":
             fileObj = open(filename, "wb")
             pickle.dump(tempDictionary, fileObj)
@@ -1584,7 +1584,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def readPlanes(self, filename=None):
         if filename is None:
-            filename = qt.QFileDialog.getOpenFileName(parent=self.interface, caption='Open file')
+            filename = qt.QFileDialog.getOpenFileName(self.interface.parent, "Open file")
         if filename != "":
             fileObj = open(filename, "rb")
             tempDictionary = pickle.load(fileObj)
