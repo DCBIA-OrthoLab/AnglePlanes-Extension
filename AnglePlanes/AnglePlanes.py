@@ -1632,7 +1632,7 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         self.delayDisplay('All tests passed!')
 
     def downloaddata(self):
-        import urllib
+        import urllib.request
         downloads = (
             ('http://slicer.kitware.com/midas3/download?items=213632', '01.vtk', slicer.util.loadModel),
             ('http://slicer.kitware.com/midas3/download?items=213633', '02.vtk', slicer.util.loadModel),
@@ -1642,7 +1642,7 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
             print(filePath)
             if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
                 logging.info('Requesting download %s from %s...\n' % (name, url))
-                urllib.urlretrieve(url, filePath)
+                urllib.request.urlretrieve(url, filePath)
             if loader:
                 logging.info('Loading %s...' % (name,))
                 loader(filePath)
