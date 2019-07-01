@@ -70,7 +70,7 @@ class AnglePlanes(ScriptedLoadableModule):
 class AnglePlanesWidget(ScriptedLoadableModuleWidget):
     def setup(self):
         ScriptedLoadableModuleWidget.setup(self)
-        print "-------Angle Planes Widget Setup-------"
+        print("-------Angle Planes Widget Setup-------")
 
         self.moduleName = "AnglePlanes"
         self.i = 0
@@ -214,7 +214,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.logic.UpdateThreeDView(self.landmarkComboBox.currentText)
 
     def onModelChanged(self):
-        print "-------Model Changed--------"
+        print("-------Model Changed--------")
         if self.logic.selectedModel:
             Model = self.logic.selectedModel
             try:
@@ -227,7 +227,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.addPlaneButton.setEnabled(False)
 
     def onLandmarksChanged(self):
-        print "-------Landmarks Changed--------"
+        print("-------Landmarks Changed--------")
         if self.inputModelSelector.currentNode():
             self.logic.FidList = self.inputLandmarksSelector.currentNode()
             self.logic.selectedFidList = self.inputLandmarksSelector.currentNode()
@@ -286,7 +286,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 if self.planeControlsDictionary[x].PlaneIsDefined():
                     planeComboBox.addItem(x)
         except NameError:
-            print "exept in fillColorsComboBox"
+            print("exept in fillColorsComboBox")
 
     def updateOnSurfaceCheckBoxes(self):
         numberOfVisibleModels = len(self.getPositionOfModelNodes(True))
@@ -308,7 +308,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         return positionOfNodes
 
     def addNewPlane(self, keyLoad=-1):
-        print "------- New plane created -------"
+        print("------- New plane created -------")
         if keyLoad != -1:
             self.planeControlsId = keyLoad
         else:
@@ -325,13 +325,13 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.selectPlaneForMidPoint.addItem(key)
 
     def RemoveManualPlane(self, id):
-        print "--- Remove a plan ---"
+        print("--- Remove a plan ---")
         key = "Plane " + str(id)
         # If the plane has already been removed (for example, when removing this plane in this function,
         # the callback on removing the nodes will be called, and therefore this function will be called again
         # We need to not do anything the second time this function is called for the same plane
         if key not in self.planeControlsDictionary.keys():
-            print "Key error"
+            print("Key error")
             return
         if self.planeComboBox1.currentText == key:
             self.planeComboBox1.setCurrentIndex(0)
@@ -539,7 +539,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
             comboBox.setCurrentIndex(comboBox.findText(oldString))
 
     def updatePlanesComboBoxes(self):
-        print "---- update plane combobox ----"
+        print("---- update plane combobox ----")
         self.planeComboBox1.blockSignals(True)
         self.planeComboBox2.blockSignals(True)
         colorPlane1 = self.planeComboBox1.currentText
@@ -570,7 +570,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
         self.defineAngle(colorPlane1, colorPlane2)
 
     def defineAngle(self, colorPlane1, colorPlane2):
-        print "--- defineAngle ---"
+        print("--- defineAngle ---")
         # print colorPlane1
         if colorPlane1 != "None":
             if colorPlane1 in self.logic.ColorNodeCorrespondence:
@@ -597,10 +597,10 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget):
                 normal2 = self.planeControlsDictionary[colorPlane2].normal
         else:
             return
-        print "normal 1"
-        print normal1
-        print "normal 2"
-        print normal2
+        print("normal 1")
+        print(normal1)
+        print("normal 2")
+        print(normal2)
         self.logic.getAngle(normal1, normal2)
 
     def onSavePlanes(self):
@@ -718,7 +718,7 @@ class AnglePlanesWidgetPlaneControl(qt.QFrame):
                                           self.slideOpacity.value, self.planeCollection, self.actor)
 
     def addLandMarkClicked(self):
-        print "Add landmarks"
+        print("Add landmarks")
         self.anglePlanes.inputModelSelector.setCurrentNode(slicer.app.mrmlScene().GetNodeByID(self.fidlist.GetAttribute("connectedModelID")))
         self.anglePlanes.inputLandmarksSelector.setCurrentNode(self.fidlist)
         # Place landmarks in the 3D scene
@@ -791,8 +791,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         for i in range(0,end):
             fidList = list.GetItemAsObject(i)
             landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
-            for key in landmarkDescription.iterkeys():
-                markupsIndex = fidList.GetMarkupIndexByID(key)
+            for key in landmarkDescription.keys():
+                markupsIndex = fidList.GetNthControlPointIndexByID(key)
                 if key != selectedFidReflID:
                     fidList.SetNthMarkupLocked(markupsIndex, True)
                 else:
@@ -840,7 +840,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                         markupID = fidList.GetNthMarkupID(n)
                         if landmarkDescription[markupID]["projection"]["isProjected"] == True:
                             hardenModel = slicer.app.mrmlScene().GetNodeByID(fidList.GetAttribute("hardenModelID"))
-                            markupsIndex = fidList.GetMarkupIndexByID(markupID)
+                            markupsIndex = fidList.GetNthControlPointIndexByID(markupID)
                             self.replaceLandmark(hardenModel.GetPolyData(), fidList, markupsIndex,
                                                  landmarkDescription[markupID]["projection"]["closestPointIndex"])
                         fidList.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
@@ -965,27 +965,27 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             return
         connectedModelID = landmarks.GetAttribute("connectedModelID")
         try:
-            tag = self.decodeJSON(landmarks.GetAttribute("MarkupAddedEventTag"))
-            landmarks.RemoveObserver(tag["MarkupAddedEventTag"])
-            print "adding observers removed!"
+            tag = self.decodeJSON(landmarks.GetAttribute("PointAddedEventTag"))
+            landmarks.RemoveObserver(tag["PointAddedEventTag"])
+            print("adding observers removed!")
         except:
             pass
         try:
             tag = self.decodeJSON(landmarks.GetAttribute("PointModifiedEventTag"))
             landmarks.RemoveObserver(tag["PointModifiedEventTag"])
-            print "moving observers removed!"
+            print("moving observers removed!")
         except:
             pass
         try:
-            tag = self.decodeJSON(landmarks.GetAttribute("MarkupRemovedEventTag"))
-            landmarks.RemoveObserver(tag["MarkupRemovedEventTag"])
-            print "removing observers removed!"
+            tag = self.decodeJSON(landmarks.GetAttribute("PointRemovedEventTag"))
+            landmarks.RemoveObserver(tag["PointRemovedEventTag"])
+            print("removing observers removed!")
         except:
             pass
         try:
             tag = self.decodeJSON(landmarks.GetAttribute("UpdatesPlanesEventTag"))
             landmarks.RemoveObserver(tag["UpdatesPlanesEventTag"])
-            print "Planes observers removed!"
+            print("Planes observers removed!")
         except:
             pass
         if connectedModelID:
@@ -1003,19 +1003,21 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         #update of the landmark Combo Box
         self.updateLandmarkComboBox(landmarks, self.interface.landmarkComboBox, False)
         #adding of listeners
-        MarkupAddedEventTag = landmarks.AddObserver(landmarks.MarkupAddedEvent, self.onMarkupAddedEvent)
-        landmarks.SetAttribute("MarkupAddedEventTag",self.encodeJSON({"MarkupAddedEventTag":MarkupAddedEventTag}))
+        PointAddedEventTag = landmarks.AddObserver(landmarks.PointAddedEvent, self.onPointAddedEvent)
+        landmarks.SetAttribute("PointAddedEventTag",self.encodeJSON({"PointAddedEventTag":PointAddedEventTag}))
         PointModifiedEventTag = landmarks.AddObserver(landmarks.PointModifiedEvent, self.onPointModifiedEvent)
         landmarks.SetAttribute("PointModifiedEventTag",self.encodeJSON({"PointModifiedEventTag":PointModifiedEventTag}))
-        MarkupRemovedEventTag = landmarks.AddObserver(landmarks.MarkupRemovedEvent, self.onMarkupRemovedEvent)
-        landmarks.SetAttribute("MarkupRemovedEventTag",self.encodeJSON({"MarkupRemovedEventTag":MarkupRemovedEventTag}))
+        PointRemovedEventTag = landmarks.AddObserver(landmarks.PointRemovedEvent, self.onPointRemovedEvent)
+        landmarks.SetAttribute("PointRemovedEventTag",self.encodeJSON({"PointRemovedEventTag":PointRemovedEventTag}))
         UpdatesPlanesEventTag = landmarks.AddObserver(landmarks.PointModifiedEvent, self.updatePlanesEvent)
         landmarks.SetAttribute("UpdatesPlanesEventTag",self.encodeJSON({"UpdatesPlanesEventTag":UpdatesPlanesEventTag}))
 
     # Called when a landmark is added on a model
-    def onMarkupAddedEvent(self, obj, event):
-        print "------markup adding-------"
+    def onPointAddedEvent(self, obj, event):
+        print("------markup adding-------")
+        print(obj)
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
+        print(landmarkDescription)
         numOfMarkups = obj.GetNumberOfMarkups()
         markupID = obj.GetNthMarkupID(numOfMarkups - 1)
         landmarkDescription[markupID] = dict()
@@ -1042,7 +1044,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                 landmark1ID = landmarkDescription[midPointID]["midPoint"]["Point1"]
                 landmark2ID = landmarkDescription[midPointID]["midPoint"]["Point2"]
                 coord = self.calculateMidPointCoord(fidList, landmark1ID, landmark2ID)
-                index = fidList.GetMarkupIndexByID(midPointID)
+                index = fidList.GetNthControlPointIndexByID(midPointID)
                 fidList.SetNthFiducialPositionFromArray(index, coord)
                 if landmarkDescription[midPointID]["projection"]["isProjected"]:
                     hardenModel = slicer.app.mrmlScene().GetNodeByID(fidList.GetAttribute("hardenModelID"))
@@ -1053,7 +1055,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     # Called when a landmarks is moved
     def onPointModifiedEvent(self, obj, event):
-        print "----onPointModifiedEvent Angle plane-----"
+        print("----onPointModifiedEvent Angle plane-----")
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
         if not landmarkDescription:
             return
@@ -1075,11 +1077,11 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         PointModifiedEventTag = obj.AddObserver(obj.PointModifiedEvent, self.onPointModifiedEvent)
         obj.SetAttribute("PointModifiedEventTag",self.encodeJSON({"PointModifiedEventTag":PointModifiedEventTag}))
 
-    def onMarkupRemovedEvent(self, obj, event):
-        print "------markup deleting-------"
+    def onPointRemovedEvent(self, obj, event):
+        print("------markup deleting-------")
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
         IDs = []
-        for ID, value in landmarkDescription.iteritems():
+        for ID, value in landmarkDescription.items():
             isFound = False
             for n in range(obj.GetNumberOfMarkups()):
                 markupID = obj.GetNthMarkupID(n)
@@ -1150,7 +1152,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def findIDFromLabel(self, fidList, landmarkLabel):
         # find the ID of the markupsNode from the label of a landmark!
         landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
-        for ID, value in landmarkDescription.iteritems():
+        for ID, value in landmarkDescription.items():
             if value["landmarkLabel"] == landmarkLabel:
                 return ID
         return None
@@ -1173,15 +1175,15 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def projectOnSurface(self, modelOnProject, fidNode, selectedFidReflID):
         if selectedFidReflID:
-            markupsIndex = fidNode.GetMarkupIndexByID(selectedFidReflID)
+            markupsIndex = fidNode.GetNthControlPointIndexByID(selectedFidReflID)
             indexClosestPoint = self.getClosestPointIndex(fidNode, modelOnProject.GetPolyData(), markupsIndex)
             self.replaceLandmark(modelOnProject.GetPolyData(), fidNode, markupsIndex, indexClosestPoint)
             return indexClosestPoint
 
     def calculateMidPointCoord(self, fidList, landmark1ID, landmark2ID):
         """Set the midpoint when you know the the mrml nodes"""
-        landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
-        landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
+        landmark1Index = fidList.GetNthControlPointIndexByID(landmark1ID)
+        landmark2Index = fidList.GetNthControlPointIndexByID(landmark2ID)
         coord1 = [-1, -1, -1]
         coord2 = [-1, -1, -1]
         fidList.GetNthFiducialPosition(landmark1Index, coord1)
@@ -1360,19 +1362,19 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             slider = 1
 
         coord = numpy.zeros(3)
-        landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
+        landmark1Index = fidList.GetNthControlPointIndexByID(landmark1ID)
         fidList.GetNthFiducialPosition(landmark1Index, coord)
         # print "Landmark1Value: ", coord
         r1 = coord[0]
         a1 = coord[1]
         s1 = coord[2]
-        landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
+        landmark2Index = fidList.GetNthControlPointIndexByID(landmark2ID)
         fidList.GetNthFiducialPosition(landmark2Index, coord)
         # print "Landmark2Value: ", coord
         r2 = coord[0]
         a2 = coord[1]
         s2 = coord[2]
-        landmark3Index = fidList.GetMarkupIndexByID(landmark3ID)
+        landmark3Index = fidList.GetNthControlPointIndexByID(landmark3ID)
         fidList.GetNthFiducialPosition(landmark3Index, coord)
         # print "Landmark3Value: ", coord
         r3 = coord[0]
@@ -1556,7 +1558,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
         arrayName = fidList.GetAttribute("arrayName")
         ROIPointListID = vtk.vtkIdList()
-        for key,activeLandmarkState in landmarkDescription.iteritems():
+        for key,activeLandmarkState in landmarkDescription.items():
             tempROIPointListID = vtk.vtkIdList()
             if activeLandmarkState["ROIradius"] != 0:
                 self.defineNeighbor(tempROIPointListID,
@@ -1613,18 +1615,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def decodeJSON(self, input):
         if input:
             input = input.replace('\'','\"')
-            return self.byteify(json.loads(input))
+            return json.loads(input)
         return None
-
-    def byteify(self, input):
-        if isinstance(input, dict):
-            return {self.byteify(key):self.byteify(value) for key,value in input.iteritems()}
-        elif isinstance(input, list):
-            return [self.byteify(element) for element in input]
-        elif isinstance(input, unicode):
-            return input.encode('utf-8')
-        else:
-            return input
 
 class AnglePlanesTest(ScriptedLoadableModuleTest):
     def setUp(self):
@@ -1649,7 +1641,7 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         )
         for url, name, loader in downloads:
             filePath = slicer.app.temporaryPath + '/' + name
-            print filePath
+            print(filePath)
             if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
                 logging.info('Requesting download %s from %s...\n' % (name, url))
                 urllib.urlretrieve(url, filePath)
@@ -1734,10 +1726,10 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
         self.delayDisplay('Testing angles')
         if test:
 
-            print "", "Angle", "Complementary"
-            print "R-L-View", widget.logic.angle_degre_RL, widget.logic.angle_degre_RL_comp
-            print "S-I-View", widget.logic.angle_degre_SI, widget.logic.angle_degre_SI_comp
-            print "A-P-View", widget.logic.angle_degre_AP, widget.logic.angle_degre_AP_comp
+            print("", "Angle", "Complementary")
+            print("R-L-View", widget.logic.angle_degre_RL, widget.logic.angle_degre_RL_comp)
+            print("S-I-View", widget.logic.angle_degre_SI, widget.logic.angle_degre_SI_comp)
+            print("A-P-View", widget.logic.angle_degre_AP, widget.logic.angle_degre_AP_comp)
             self.delayDisplay('Test Failure!')
             return False
 
