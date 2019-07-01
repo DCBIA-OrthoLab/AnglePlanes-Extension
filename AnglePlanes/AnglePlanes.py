@@ -1015,9 +1015,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     # Called when a landmark is added on a model
     def onPointAddedEvent(self, obj, event):
         print("------markup adding-------")
-        print(obj)
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
-        print(landmarkDescription)
         numOfMarkups = obj.GetNumberOfMarkups()
         markupID = obj.GetNthMarkupID(numOfMarkups - 1)
         landmarkDescription[markupID] = dict()
