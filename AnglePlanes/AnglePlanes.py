@@ -794,7 +794,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             fidList = list.GetItemAsObject(i)
             landmarkDescription = self.decodeJSON(fidList.GetAttribute("landmarkDescription"))
             for key in landmarkDescription.keys():
-                markupsIndex = fidList.GetMarkupIndexByID(key)
+                markupsIndex = fidList.GetNthControlPointIndexByID(key)
                 if key != selectedFidReflID:
                     fidList.SetNthMarkupLocked(markupsIndex, True)
                 else:
@@ -842,7 +842,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                         markupID = fidList.GetNthMarkupID(n)
                         if landmarkDescription[markupID]["projection"]["isProjected"] == True:
                             hardenModel = slicer.app.mrmlScene().GetNodeByID(fidList.GetAttribute("hardenModelID"))
-                            markupsIndex = fidList.GetMarkupIndexByID(markupID)
+                            markupsIndex = fidList.GetNthControlPointIndexByID(markupID)
                             self.replaceLandmark(hardenModel.GetPolyData(), fidList, markupsIndex,
                                                  landmarkDescription[markupID]["projection"]["closestPointIndex"])
                         fidList.SetAttribute("landmarkDescription",self.encodeJSON(landmarkDescription))
@@ -967,8 +967,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             return
         connectedModelID = landmarks.GetAttribute("connectedModelID")
         try:
-            tag = self.decodeJSON(landmarks.GetAttribute("MarkupAddedEventTag"))
-            landmarks.RemoveObserver(tag["MarkupAddedEventTag"])
+            tag = self.decodeJSON(landmarks.GetAttribute("PointAddedEventTag"))
+            landmarks.RemoveObserver(tag["PointAddedEventTag"])
             print("adding observers removed!")
         except:
             pass
@@ -979,8 +979,8 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         except:
             pass
         try:
-            tag = self.decodeJSON(landmarks.GetAttribute("MarkupRemovedEventTag"))
-            landmarks.RemoveObserver(tag["MarkupRemovedEventTag"])
+            tag = self.decodeJSON(landmarks.GetAttribute("PointRemovedEventTag"))
+            landmarks.RemoveObserver(tag["PointRemovedEventTag"])
             print("removing observers removed!")
         except:
             pass
@@ -1005,17 +1005,17 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         #update of the landmark Combo Box
         self.updateLandmarkComboBox(landmarks, self.interface.landmarkComboBox, False)
         #adding of listeners
-        MarkupAddedEventTag = landmarks.AddObserver(landmarks.MarkupAddedEvent, self.onMarkupAddedEvent)
-        landmarks.SetAttribute("MarkupAddedEventTag",self.encodeJSON({"MarkupAddedEventTag":MarkupAddedEventTag}))
+        PointAddedEventTag = landmarks.AddObserver(landmarks.PointAddedEvent, self.onPointAddedEvent)
+        landmarks.SetAttribute("PointAddedEventTag",self.encodeJSON({"PointAddedEventTag":PointAddedEventTag}))
         PointModifiedEventTag = landmarks.AddObserver(landmarks.PointModifiedEvent, self.onPointModifiedEvent)
         landmarks.SetAttribute("PointModifiedEventTag",self.encodeJSON({"PointModifiedEventTag":PointModifiedEventTag}))
-        MarkupRemovedEventTag = landmarks.AddObserver(landmarks.MarkupRemovedEvent, self.onMarkupRemovedEvent)
-        landmarks.SetAttribute("MarkupRemovedEventTag",self.encodeJSON({"MarkupRemovedEventTag":MarkupRemovedEventTag}))
+        PointRemovedEventTag = landmarks.AddObserver(landmarks.PointRemovedEvent, self.onPointRemovedEvent)
+        landmarks.SetAttribute("PointRemovedEventTag",self.encodeJSON({"PointRemovedEventTag":PointRemovedEventTag}))
         UpdatesPlanesEventTag = landmarks.AddObserver(landmarks.PointModifiedEvent, self.updatePlanesEvent)
         landmarks.SetAttribute("UpdatesPlanesEventTag",self.encodeJSON({"UpdatesPlanesEventTag":UpdatesPlanesEventTag}))
 
     # Called when a landmark is added on a model
-    def onMarkupAddedEvent(self, obj, event):
+    def onPointAddedEvent(self, obj, event):
         print("------markup adding-------")
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
         numOfMarkups = obj.GetNumberOfMarkups()
@@ -1044,7 +1044,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
                 landmark1ID = landmarkDescription[midPointID]["midPoint"]["Point1"]
                 landmark2ID = landmarkDescription[midPointID]["midPoint"]["Point2"]
                 coord = self.calculateMidPointCoord(fidList, landmark1ID, landmark2ID)
-                index = fidList.GetMarkupIndexByID(midPointID)
+                index = fidList.GetNthControlPointIndexByID(midPointID)
                 fidList.SetNthFiducialPositionFromArray(index, coord)
                 if landmarkDescription[midPointID]["projection"]["isProjected"]:
                     hardenModel = slicer.app.mrmlScene().GetNodeByID(fidList.GetAttribute("hardenModelID"))
@@ -1077,7 +1077,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
         PointModifiedEventTag = obj.AddObserver(obj.PointModifiedEvent, self.onPointModifiedEvent)
         obj.SetAttribute("PointModifiedEventTag",self.encodeJSON({"PointModifiedEventTag":PointModifiedEventTag}))
 
-    def onMarkupRemovedEvent(self, obj, event):
+    def onPointRemovedEvent(self, obj, event):
         print("------markup deleting-------")
         landmarkDescription = self.decodeJSON(obj.GetAttribute("landmarkDescription"))
         IDs = []
@@ -1175,15 +1175,15 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def projectOnSurface(self, modelOnProject, fidNode, selectedFidReflID):
         if selectedFidReflID:
-            markupsIndex = fidNode.GetMarkupIndexByID(selectedFidReflID)
+            markupsIndex = fidNode.GetNthControlPointIndexByID(selectedFidReflID)
             indexClosestPoint = self.getClosestPointIndex(fidNode, modelOnProject.GetPolyData(), markupsIndex)
             self.replaceLandmark(modelOnProject.GetPolyData(), fidNode, markupsIndex, indexClosestPoint)
             return indexClosestPoint
 
     def calculateMidPointCoord(self, fidList, landmark1ID, landmark2ID):
         """Set the midpoint when you know the the mrml nodes"""
-        landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
-        landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
+        landmark1Index = fidList.GetNthControlPointIndexByID(landmark1ID)
+        landmark2Index = fidList.GetNthControlPointIndexByID(landmark2ID)
         coord1 = [-1, -1, -1]
         coord2 = [-1, -1, -1]
         fidList.GetNthFiducialPosition(landmark1Index, coord1)
@@ -1362,19 +1362,19 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
             slider = 1
 
         coord = numpy.zeros(3)
-        landmark1Index = fidList.GetMarkupIndexByID(landmark1ID)
+        landmark1Index = fidList.GetNthControlPointIndexByID(landmark1ID)
         fidList.GetNthFiducialPosition(landmark1Index, coord)
         # print "Landmark1Value: ", coord
         r1 = coord[0]
         a1 = coord[1]
         s1 = coord[2]
-        landmark2Index = fidList.GetMarkupIndexByID(landmark2ID)
+        landmark2Index = fidList.GetNthControlPointIndexByID(landmark2ID)
         fidList.GetNthFiducialPosition(landmark2Index, coord)
         # print "Landmark2Value: ", coord
         r2 = coord[0]
         a2 = coord[1]
         s2 = coord[2]
-        landmark3Index = fidList.GetMarkupIndexByID(landmark3ID)
+        landmark3Index = fidList.GetNthControlPointIndexByID(landmark3ID)
         fidList.GetNthFiducialPosition(landmark3Index, coord)
         # print "Landmark3Value: ", coord
         r3 = coord[0]
