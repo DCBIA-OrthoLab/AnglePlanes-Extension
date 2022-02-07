@@ -270,7 +270,7 @@ class AnglePlanesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     def onChangeMiddlePointFiducialNode(self):
         key = self.selectPlaneForMidPoint.currentText
-        if key is "":
+        if key == "":
             return
         plane = self.planeControlsDictionary[key]
         fidList = plane.fidlist
@@ -857,7 +857,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
     def isUnderTransform(self, markups):
         if markups.GetParentTransformNode():
             messageBox = ctk.ctkMessageBox()
-            messageBox.setWindowTitle(" /!\ WARNING /!\ ")
+            messageBox.setWindowTitle(r" /!\ WARNING /!\ ")
             messageBox.setIcon(messageBox.Warning)
             messageBox.setText("Your Markup Fiducial Node is currently modified by a transform,"
                                "if you choose to continue the program will apply the transform"
@@ -880,7 +880,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def connectedModelChangement(self):
         messageBox = ctk.ctkMessageBox()
-        messageBox.setWindowTitle(" /!\ WARNING /!\ ")
+        messageBox.setWindowTitle(r" /!\ WARNING /!\ ")
         messageBox.setIcon(messageBox.Warning)
         messageBox.setText("The Markup Fiducial Node selected is curently projected on an"
                            "other model, if you chose to continue the fiducials will be  "
@@ -1592,7 +1592,7 @@ class AnglePlanesLogic(ScriptedLoadableModuleLogic):
 
     def warningMessage(self, message):
         messageBox = ctk.ctkMessageBox()
-        messageBox.setWindowTitle(" /!\ WARNING /!\ ")
+        messageBox.setWindowTitle(r" /!\ WARNING /!\ ")
         messageBox.setIcon(messageBox.Warning)
         messageBox.setText(message)
         messageBox.setStandardButtons(messageBox.Ok)
@@ -1635,10 +1635,10 @@ class AnglePlanesTest(ScriptedLoadableModuleTest):
             filePath = slicer.app.temporaryPath + '/' + name
             print(filePath)
             if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
-                logging.info('Requesting download %s from %s...\n' % (name, url))
+                logging.info(f'Requesting download {name} from {url}...\n')
                 urllib.request.urlretrieve(url, filePath)
             if loader:
-                logging.info('Loading %s...' % (name,))
+                logging.info(f'Loading {name}...')
                 loader(filePath)
 
         layoutManager = slicer.app.layoutManager()
